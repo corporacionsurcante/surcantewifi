@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { MercadoPagoConfig, Payment } from "mercadopago";
 import { buscarPago, marcarPagoConfirmado } from "@/lib/pagos";
+import { autorizarClienteEnOmada } from "@/lib/omada";
 
 const cliente = new MercadoPagoConfig({
   accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN!,
@@ -62,25 +63,41 @@ export async function POST(solicitud: NextRequest) {
 
     marcarPagoConfirmado(referenciaExterna);
 
-    // ──────────────────────────────────────────────────────────
-    // ACA VA OMADA: este es el punto donde hay que llamar a la
-    // API del controlador Omada para autorizar a pagoGuardado.clientMac
-    // por pagoGuardado.duracionMinutos exactos.
+    // Llamamos a la API de Omada para autorizar el acceso real.
     //
-    // Si el pasajero ya tenía tiempo activo de un pack anterior,
-    // hay que SUMAR estos minutos al tiempo que le quedaba, no
-    // reemplazarlo, para no perder el tiempo ya pagado.
-    //
-    // Datos disponibles para esa llamada:
-    //   pagoGuardado.clientMac
-    //   pagoGuardado.apMac
-    //   pagoGuardado.duracionMinutos
-    // ──────────────────────────────────────────────────────────
+    // IMPORTANTE: por ahora esto AUTORIZA por la duración del plan
+    // comprado, pero todavía no SUMA tiempo si el pasajero ya tenía
+    // un pack activo de antes (eso requeriría que Omada nos diga
+    // cuánto tiempo le queda a esa MAC, y la documentación de este
+    // endpoint no expone esa consulta directamente). Por ahora, si
+    // alguien compra un pack adicional antes de que se le acabe el
+    // anterior, el nuevo "time" reemplaza al anterior en vez de
+    // sumarse. Es un caso de borde a resolver más adelante.
+    const resultadoOmada = await autorizarClienteEnOmada({
+      clientMac: pagoGuardado.clientMac,
+      apMac: pagoGuardado.apMac,
+      ssidName: pagoGuardado.ssidName,
+      site: pagoGuardado.site,
+      minutos: pagoGuardado.duracionMinutos,
+    });
+
+    if (!resultadoOmada.exito) {
+      // El pago ya está confirmado y guardado (no se pierde), pero
+      // la autorización en el router falló. Lo dejamos registrado
+      // para poder revisarlo manualmente; no tiene sentido devolver
+      // un error a Mercado Pago, porque el problema no es del pago.
+      console.error(
+        "[webhook-pago] El pago se confirmó pero Omada no autorizó el acceso:",
+        resultadoOmada.motivo,
+        "MAC:",
+        pagoGuardado.clientMac
+      );
+    }
 
     console.log(
       "[webhook-pago] Pago confirmado. MAC:",
       pagoGuardado.clientMac,
-      "Minutos a autorizar:",
+      "Minutos autorizados:",
       pagoGuardado.duracionMinutos
     );
 
