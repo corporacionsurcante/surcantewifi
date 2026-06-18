@@ -13,6 +13,8 @@ export type PagoPendiente = {
   duracionMinutos: number;
   clientMac: string;
   apMac: string;
+  ssidName: string;
+  site: string;
   redirectUrl: string;
   creadoEn: number;
   confirmadoEn: number | null;
