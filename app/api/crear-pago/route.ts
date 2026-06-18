@@ -9,7 +9,7 @@ const cliente = new MercadoPagoConfig({
 
 export async function POST(solicitud: NextRequest) {
   const cuerpo = await solicitud.json();
-  const { planId, clientMac, apMac, redirectUrl } = cuerpo;
+  const { planId, clientMac, apMac, redirectUrl, ssidName, site } = cuerpo;
 
   const plan = buscarPlan(planId);
   if (!plan) {
@@ -60,6 +60,8 @@ export async function POST(solicitud: NextRequest) {
       duracionMinutos: plan.duracionMinutos,
       clientMac: clientMac ?? "",
       apMac: apMac ?? "",
+      ssidName: ssidName ?? "",
+      site: site ?? "",
       redirectUrl: redirectUrl ?? "",
       creadoEn: Date.now(),
       confirmadoEn: null,
