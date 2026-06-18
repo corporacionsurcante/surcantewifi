@@ -40,6 +40,8 @@ function ContenidoPortal() {
   const macCliente = parametros.get("clientMac") || macDePrueba;
   const macAp = parametros.get("apMac") ?? "";
   const urlRedireccion = parametros.get("redirectUrl") ?? "";
+  const nombreSsid = parametros.get("ssidName") ?? "";
+  const nombreSitio = parametros.get("site") ?? "";
 
   async function canjearCodigo() {
     setErrorCodigo(null);
@@ -48,7 +50,13 @@ function ContenidoPortal() {
       const respuesta = await fetch("/api/canjear-codigo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ codigo, clientMac: macCliente }),
+        body: JSON.stringify({
+          codigo,
+          clientMac: macCliente,
+          apMac: macAp,
+          ssidName: nombreSsid,
+          site: nombreSitio,
+        }),
       });
       const datos = await respuesta.json();
       if (datos.exito) {
@@ -75,6 +83,8 @@ function ContenidoPortal() {
           clientMac: macCliente,
           apMac: macAp,
           redirectUrl: urlRedireccion,
+          ssidName: nombreSsid,
+          site: nombreSitio,
         }),
       });
 
