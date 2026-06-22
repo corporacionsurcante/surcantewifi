@@ -254,3 +254,4 @@ function TarjetaPlan({
       </p>
     </button>
   );
+}
