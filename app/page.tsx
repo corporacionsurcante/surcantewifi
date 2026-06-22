@@ -4,6 +4,24 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PLANES } from "@/lib/planes";
 
+interface TarjetaPlanProps {
+  nombre: string;
+  descripcion: string;
+  precio: number;
+  seleccionado: boolean;
+  onClick: () => void;
+}
+
+interface SeccionCodigoProps {
+  mostrar: boolean;
+  onMostrar: () => void;
+  codigo: string;
+  onCambiarCodigo: (valor: string) => void;
+  onCanjear: () => void;
+  canjeando: boolean;
+  error: string | null;
+}
+
 export default function PaginaPortal() {
   return (
     <Suspense fallback={null}>
@@ -24,6 +42,7 @@ function ContenidoPortal() {
   const [canjeando, setCanjeando] = useState(false);
 
   const [macDePrueba, setMacDePrueba] = useState("");
+  
   useEffect(() => {
     const clave = "surcante-mac-prueba";
     let mac = window.localStorage.getItem(clave);
@@ -68,7 +87,6 @@ function ContenidoPortal() {
     }
   }
 
-  // Función modificada para abrir directamente la pasarela
   async function pagarYConectarme(usarAppDirecta: boolean = false) {
     setError(null);
     setCargando(true);
@@ -93,11 +111,9 @@ function ContenidoPortal() {
       const datos = await respuesta.json();
       
       if (usarAppDirecta) {
-        // Truco de escape: intentamos abrir usando una pestaña en blanco para forzar la salida a Safari/Chrome
         window.open(datos.urlPago, "_blank");
         setCargando(false);
       } else {
-        // Redirección tradicional en la misma ventana
         window.location.href = datos.urlPago;
       }
 
@@ -133,7 +149,6 @@ function ContenidoPortal() {
           <p className="text-sm text-red-400 mt-4 text-center">{error}</p>
         )}
 
-        {/* BOTÓN 1: El flujo clásico en la misma ventana */}
         <button
           onClick={() => pagarYConectarme(false)}
           disabled={cargando}
@@ -142,7 +157,6 @@ function ContenidoPortal() {
           {cargando ? "Abriendo pago..." : "Pagar en este navegador"}
         </button>
 
-        {/* BOTÓN 2: EL BOTÓN DE ESCAPE SIEMPRE VISIBLE ABAJO */}
         <button
           onClick={() => pagarYConectarme(true)}
           disabled={cargando}
@@ -181,15 +195,7 @@ function SeccionCodigo({
   onCanjear,
   canjeando,
   error,
-}: {
-  mostrar: boolean;
-  onMostrar: () => void;
-  codigo: string;
-  onCambiarCodigo: (valor: string) => void;
-  onCanjear: () => void;
-  canjeando: boolean;
-  error: string | null;
-}) {
+}: SeccionCodigoProps) {
   if (!mostrar) {
     return (
       <button
@@ -221,59 +227,4 @@ function SeccionCodigo({
         disabled={canjeando || !codigo}
         className="w-full py-3 rounded-xl text-[14px] font-medium bg-[#18181B] border border-[#2A2A2E] hover:bg-[#211A2B] transition disabled:opacity-60"
       >
-        {canjeando ? "Validando..." : "Usar código"}
-      </button>
-    </div>
-  );
-}
-
-function CabeceraMarca() {
-  return (
-    <div className="text-center mb-7">
-      <div className="flex items-center justify-center gap-1.5 mb-5">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#8B5FBF] animate-pulse" />
-        <span className="text-[11px] text-[#A0A0A8] tracking-wide">
-          CONECTADO A WIFI SURCANTE
-        </span>
-      </div>
-      <div className="w-16 h-16 rounded-full bg-[#6E3FA3] flex items-center justify-center mx-auto">
-        <span className="text-white text-3xl font-medium">S</span>
-      </div>
-      <p className="text-white text-xl font-medium mt-4 mb-1">
-        Surcante WiFi
-      </p>
-      <p className="text-[#A0A0A8] text-[13px]">Tu viaje, conectado</p>
-    </div>
-  );
-}
-
-function TarjetaPlan({
-  nombre,
-  descripcion,
-  precio,
-  seleccionado,
-  onClick,
-}: {
-  nombre: string;
-  descripcion: string;
-  precio: number;
-  seleccionado: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex items-center justify-between rounded-2xl px-4 py-3.5 text-left transition border ${
-        seleccionado
-          ? "bg-[#211A2B] border-[#8B5FBF]"
-          : "bg-[#18181B] border-[#2A2A2E]"
-      }`}
-    >
-      <div>
-        <p className="text-[14px] font-medium text-white">{nombre}</p>
-        <p className="text-[13px] text-[#A0A0A8] mt-0.5">{descripcion}</p>
-      </div>
-      <p className="text-[18px] font-medium text-white whitespace-nowrap ml-3">
-        ${precio.toLocaleString("es-AR")}
-      </p>
-    </
+        {canjeando ? "
