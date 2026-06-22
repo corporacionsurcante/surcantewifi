@@ -16,16 +16,10 @@ export async function POST(solicitud: NextRequest) {
     return NextResponse.json({ error: "Plan inválido" }, { status: 400 });
   }
 
-  // Identificador único para esta compra. Lo usamos como
-  // external_reference para poder reconocer este pago cuando
-  // llegue la confirmación al webhook.
   const referenciaExterna = `surcante-${Date.now()}-${Math.random()
     .toString(36)
     .slice(2, 8)}`;
 
-  // Tomamos la URL del sitio desde la propia solicitud, así
-  // funciona automáticamente sin importar el dominio (vercel.app
-  // o uno propio más adelante).
   const origen = solicitud.nextUrl.origin;
 
   try {
@@ -52,8 +46,6 @@ export async function POST(solicitud: NextRequest) {
       },
     });
 
-    // Guardamos los datos de esta compra para poder recuperarlos
-    // cuando llegue la notificación del webhook.
     guardarPagoPendiente({
       preferenciaId: referenciaExterna,
       planId: plan.id,
@@ -76,8 +68,10 @@ export async function POST(solicitud: NextRequest) {
       clientMac
     );
 
+    // mobile_init_point abre la app de Mercado Pago en iOS y Android.
+    // init_point es el fallback para navegador de escritorio.
     return NextResponse.json({
-      urlPago: resultado.init_point,
+      urlPago: resultado.mobile_init_point ?? resultado.init_point,
       preferenciaId: referenciaExterna,
     });
   } catch (error) {
