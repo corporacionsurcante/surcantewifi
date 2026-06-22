@@ -4,24 +4,6 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PLANES } from "@/lib/planes";
 
-interface TarjetaPlanProps {
-  nombre: string;
-  descripcion: string;
-  precio: number;
-  seleccionado: boolean;
-  onClick: () => void;
-}
-
-interface SeccionCodigoProps {
-  mostrar: boolean;
-  onMostrar: () => void;
-  codigo: string;
-  onCambiarCodigo: (valor: string) => void;
-  onCanjear: () => void;
-  canjeando: boolean;
-  error: string | null;
-}
-
 export default function PaginaPortal() {
   return (
     <Suspense fallback={null}>
@@ -126,22 +108,48 @@ function ContenidoPortal() {
   return (
     <main className="min-h-screen flex flex-col items-center px-5 py-9">
       <div className="w-full max-w-sm">
-        <CabeceraMarca />
+        
+        {/* CABECERA MARCA */}
+        <div className="text-center mb-7">
+          <div className="flex items-center justify-center gap-1.5 mb-5">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#8B5FBF] animate-pulse" />
+            <span className="text-[11px] text-[#A0A0A8] tracking-wide">
+              CONECTADO A WIFI SURCANTE
+            </span>
+          </div>
+          <div className="w-16 h-16 rounded-full bg-[#6E3FA3] flex items-center justify-center mx-auto">
+            <span className="text-white text-3xl font-medium">S</span>
+          </div>
+          <p className="text-white text-xl font-medium mt-4 mb-1">
+            Surcante WiFi
+          </p>
+          <p className="text-[#A0A0A8] text-[13px]">Tu viaje, conectado</p>
+        </div>
 
         <p className="text-xs font-medium text-[#8B5FBF] uppercase tracking-wide mb-3">
           Elegí tu plan
         </p>
 
+        {/* LISTADO DE PLANES */}
         <div className="flex flex-col gap-2.5">
           {PLANES.map((plan) => (
-            <TarjetaPlan
+            <button
               key={plan.id}
-              nombre={plan.nombre}
-              descripcion={plan.descripcion}
-              precio={plan.precio}
-              seleccionado={planSeleccionado === plan.id}
               onClick={() => setPlanSeleccionado(plan.id)}
-            />
+              className={`flex items-center justify-between rounded-2xl px-4 py-3.5 text-left transition border ${
+                planSeleccionado === plan.id
+                  ? "bg-[#211A2B] border-[#8B5FBF]"
+                  : "bg-[#18181B] border-[#2A2A2E]"
+              }`}
+            >
+              <div>
+                <p className="text-[14px] font-medium text-white">{plan.nombre}</p>
+                <p className="text-[13px] text-[#A0A0A8] mt-0.5">{plan.descripcion}</p>
+              </div>
+              <p className="text-[18px] font-medium text-white whitespace-nowrap ml-3">
+                ${plan.precio.toLocaleString("es-AR")}
+              </p>
+            </button>
           ))}
         </div>
 
@@ -149,6 +157,7 @@ function ContenidoPortal() {
           <p className="text-sm text-red-400 mt-4 text-center">{error}</p>
         )}
 
+        {/* BOTONES DE PAGO */}
         <button
           onClick={() => pagarYConectarme(false)}
           disabled={cargando}
@@ -173,58 +182,40 @@ function ContenidoPortal() {
           Al continuar aceptás los términos de servicio · Surcante
         </p>
 
-        <SeccionCodigo
-          mostrar={mostrarCodigo}
-          onMostrar={() => setMostrarCodigo(true)}
-          codigo={codigo}
-          onCambiarCodigo={setCodigo}
-          onCanjear={canjearCodigo}
-          canjeando={canjeando}
-          error={errorCodigo}
-        />
+        {/* SECCIÓN CANJEAR CÓDIGO */}
+        {!mostrarCodigo ? (
+          <button
+            onClick={() => setMostrarCodigo(true)}
+            className="block w-full text-center text-[12px] text-[#5A5A60] mt-6 underline"
+          >
+            ¿Tenés un código de acceso?
+          </button>
+        ) : (
+          <div className="mt-6 pt-5 border-t border-[#2A2A2E]">
+            <p className="text-[12px] text-[#A0A0A8] mb-2 text-center">
+              Ingresá tu código de acceso
+            </p>
+            <input
+              type="text"
+              value={codigo}
+              onChange={(e) => setCodigo(e.target.value.toUpperCase())}
+              placeholder="XXXX-XXXX"
+              className="w-full px-4 py-3 rounded-xl bg-[#18181B] border border-[#2A2A2E] text-white text-center font-mono tracking-wide mb-2"
+            />
+            {errorCodigo && (
+              <p className="text-sm text-red-400 mb-2 text-center">{errorCodigo}</p>
+            )}
+            <button
+              onClick={canjearCodigo}
+              disabled={canjeando || !codigo}
+              className="w-full py-3 rounded-xl text-[14px] font-medium bg-[#18181B] border border-[#2A2A2E] hover:bg-[#211A2B] transition disabled:opacity-60"
+            >
+              {canjeando ? "Validando..." : "Usar código"}
+            </button>
+          </div>
+        )}
+
       </div>
     </main>
   );
 }
-
-function SeccionCodigo({
-  mostrar,
-  onMostrar,
-  codigo,
-  onCambiarCodigo,
-  onCanjear,
-  canjeando,
-  error,
-}: SeccionCodigoProps) {
-  if (!mostrar) {
-    return (
-      <button
-        onClick={onMostrar}
-        className="block w-full text-center text-[12px] text-[#5A5A60] mt-6 underline"
-      >
-        ¿Tenés un código de acceso?
-      </button>
-    );
-  }
-
-  return (
-    <div className="mt-6 pt-5 border-t border-[#2A2A2E]">
-      <p className="text-[12px] text-[#A0A0A8] mb-2 text-center">
-        Ingresá tu código de acceso
-      </p>
-      <input
-        type="text"
-        value={codigo}
-        onChange={(e) => onCambiarCodigo(e.target.value.toUpperCase())}
-        placeholder="XXXX-XXXX"
-        className="w-full px-4 py-3 rounded-xl bg-[#18181B] border border-[#2A2A2E] text-white text-center font-mono tracking-wide mb-2"
-      />
-      {error && (
-        <p className="text-sm text-red-400 mb-2 text-center">{error}</p>
-      )}
-      <button
-        onClick={onCanjear}
-        disabled={canjeando || !codigo}
-        className="w-full py-3 rounded-xl text-[14px] font-medium bg-[#18181B] border border-[#2A2A2E] hover:bg-[#211A2B] transition disabled:opacity-60"
-      >
-        {canjeando ? "
