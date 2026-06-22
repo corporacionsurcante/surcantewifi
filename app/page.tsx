@@ -23,9 +23,6 @@ function ContenidoPortal() {
   const [errorCodigo, setErrorCodigo] = useState<string | null>(null);
   const [canjeando, setCanjeando] = useState(false);
 
-  // En el bus real, el router Omada agrega clientMac a la URL.
-  // En tu computadora, no hay router, así que generamos un
-  // identificador de prueba la primera vez que carga la página.
   const [macDePrueba, setMacDePrueba] = useState("");
   useEffect(() => {
     const clave = "surcante-mac-prueba";
@@ -93,19 +90,7 @@ function ContenidoPortal() {
       }
 
       const datos = await respuesta.json();
-
-      // Intentar abrir la app de Mercado Pago con deep link.
-      // Si no está instalada, después de 2 segundos abre la web como fallback.
-      const deepLink = datos.urlPago.replace(
-        "https://www.mercadopago.com.ar",
-        "mercadopago://checkout"
-      );
-      window.location.href = deepLink;
-
-      setTimeout(() => {
-        window.location.href = datos.urlPago;
-      }, 2000);
-
+      window.location.href = datos.urlPago;
     } catch (e) {
       setError("Hubo un problema al iniciar el pago. Probá de nuevo.");
       setCargando(false);
@@ -269,4 +254,3 @@ function TarjetaPlan({
       </p>
     </button>
   );
-}
