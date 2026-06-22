@@ -93,7 +93,19 @@ function ContenidoPortal() {
       }
 
       const datos = await respuesta.json();
-      window.location.href = datos.urlPago;
+
+      // Intentar abrir la app de Mercado Pago con deep link.
+      // Si no está instalada, después de 2 segundos abre la web como fallback.
+      const deepLink = datos.urlPago.replace(
+        "https://www.mercadopago.com.ar",
+        "mercadopago://checkout"
+      );
+      window.location.href = deepLink;
+
+      setTimeout(() => {
+        window.location.href = datos.urlPago;
+      }, 2000);
+
     } catch (e) {
       setError("Hubo un problema al iniciar el pago. Probá de nuevo.");
       setCargando(false);
