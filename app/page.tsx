@@ -23,10 +23,6 @@ function ContenidoPortal() {
   const [errorCodigo, setErrorCodigo] = useState<string | null>(null);
   const [canjeando, setCanjeando] = useState(false);
 
-  // Estados nuevos para el manejo del link alternativo
-  const [urlPagoGenerada, setUrlPagoGenerada] = useState<string | null>(null);
-  const [copiado, setCopiado] = useState(false);
-
   const [macDePrueba, setMacDePrueba] = useState("");
   useEffect(() => {
     const clave = "surcante-mac-prueba";
@@ -72,12 +68,10 @@ function ContenidoPortal() {
     }
   }
 
-  async function pagarYConectarme() {
+  // Función modificada para abrir directamente la pasarela
+  async function pagarYConectarme(usarAppDirecta: boolean = false) {
     setError(null);
     setCargando(true);
-    setUrlPagoGenerada(null);
-    setCopiado(false);
-    
     try {
       const respuesta = await fetch("/api/crear-pago", {
         method: "POST",
@@ -98,38 +92,20 @@ function ContenidoPortal() {
 
       const datos = await respuesta.json();
       
-      // Guardamos la URL generada para mostrarla como alternativa de escape
-      setUrlPagoGenerada(datos.urlPago);
-      setCargando(false);
+      if (usarAppDirecta) {
+        // Truco de escape: intentamos abrir usando una pestaña en blanco para forzar la salida a Safari/Chrome
+        window.open(datos.urlPago, "_blank");
+        setCargando(false);
+      } else {
+        // Redirección tradicional en la misma ventana
+        window.location.href = datos.urlPago;
+      }
 
-      // Intento estándar: Abrir en una pestaña nueva (puede ser bloqueado por el mini-navegador)
-      window.open(datos.urlPago, "_blank");
-      
     } catch (e) {
       setError("Hubo un problema al iniciar el pago. Probá de nuevo.");
       setCargando(false);
     }
   }
-
-  const copiarAlPortapapeles = async () => {
-    if (urlPagoGenerada) {
-      try {
-        await navigator.clipboard.writeText(urlPagoGenerada);
-        setCopiado(true);
-        setTimeout(() => setCopiado(false), 3000);
-      } catch (err) {
-        // Resguardo manual si la API de portapapeles está bloqueada en el mini-navegador
-        const input = document.createElement("input");
-        input.value = urlPagoGenerada;
-        document.body.appendChild(input);
-        input.select();
-        document.execCommand("copy");
-        document.body.removeChild(input);
-        setCopiado(true);
-        setTimeout(() => setCopiado(false), 3000);
-      }
-    }
-  };
 
   return (
     <main className="min-h-screen flex flex-col items-center px-5 py-9">
@@ -157,51 +133,27 @@ function ContenidoPortal() {
           <p className="text-sm text-red-400 mt-4 text-center">{error}</p>
         )}
 
-        {/* Botón principal de acción */}
-        {!urlPagoGenerada && (
-          <button
-            onClick={pagarYConectarme}
-            disabled={cargando}
-            className="w-full mt-5 py-3.5 rounded-xl text-[15px] font-medium bg-[#6E3FA3] hover:bg-[#5A3286] active:scale-[0.98] transition disabled:opacity-60"
-          >
-            {cargando ? "Generando pago..." : "Pagar y conectarme"}
-          </button>
-        )}
+        {/* BOTÓN 1: El flujo clásico en la misma ventana */}
+        <button
+          onClick={() => pagarYConectarme(false)}
+          disabled={cargando}
+          className="w-full mt-5 py-3.5 rounded-xl text-[15px] font-medium bg-[#6E3FA3] hover:bg-[#5A3286] active:scale-[0.98] transition disabled:opacity-60"
+        >
+          {cargando ? "Abriendo pago..." : "Pagar en este navegador"}
+        </button>
 
-        {/* --- SECCIÓN DE ESCAPE COMPATIBLE CON IPHONE / TABLETS --- */}
-        {urlPagoGenerada && (
-          <div className="mt-5 p-4 rounded-xl bg-[#211A2B] border border-[#8B5FBF] text-center">
-            <p className="text-sm text-white font-medium mb-3">
-              ¡Link de Mercado Pago listo!
-            </p>
-            
-            <a 
-              href={urlPagoGenerada} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="block w-full py-3 mb-2.5 rounded-lg text-xs bg-[#6E3FA3] text-white font-medium hover:bg-[#5A3286]"
-            >
-              1. Intentar abrir la App otra vez
-            </a>
+        {/* BOTÓN 2: EL BOTÓN DE ESCAPE SIEMPRE VISIBLE ABAJO */}
+        <button
+          onClick={() => pagarYConectarme(true)}
+          disabled={cargando}
+          className="w-full mt-2.5 py-3 rounded-xl text-[13px] font-medium bg-[#18181B] text-white border border-[#8B5FBF] hover:bg-[#211A2B] active:scale-[0.98] transition disabled:opacity-60"
+        >
+          {cargando ? "Forzando..." : "📱 Abrir en la App de Mercado Pago"}
+        </button>
 
-            <div className="border-t border-dashed border-[#8B5FBF]/30 my-3"></div>
-
-            <p className="text-[11px] text-[#A0A0A8] mb-2">
-              Si te dejó atrapado en esta pantalla, copiá el link de abajo, abrí Safari o Chrome y pegalo ahí para forzar la App:
-            </p>
-
-            <button
-              onClick={copiarAlPortapapeles}
-              className={`w-full py-2.5 rounded-lg text-xs font-medium transition ${
-                copiado 
-                  ? "bg-green-600 text-white" 
-                  : "bg-[#18181B] text-white border border-[#2A2A2E] hover:bg-[#252529]"
-              }`}
-            >
-              {copiado ? "✓ ¡Enlace copiado!" : "2. Copiar enlace de pago"}
-            </button>
-          </div>
-        )}
+        <p className="text-[11px] text-[#5A5A60] text-center mt-2.5 px-2">
+          Nota: Si el primer botón falla o no te deja usar tu cuenta, usá el botón de la <b>App de Mercado Pago</b> para saltar el bloqueo.
+        </p>
 
         <p className="text-[11px] text-[#5A5A60] text-center mt-4">
           Al continuar aceptás los términos de servicio · Surcante
@@ -324,6 +276,4 @@ function TarjetaPlan({
       <p className="text-[18px] font-medium text-white whitespace-nowrap ml-3">
         ${precio.toLocaleString("es-AR")}
       </p>
-    </button>
-  );
-}
+    </
