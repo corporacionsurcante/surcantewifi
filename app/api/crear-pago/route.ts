@@ -68,10 +68,13 @@ export async function POST(solicitud: NextRequest) {
       clientMac
     );
 
-    // mobile_init_point abre la app de Mercado Pago en iOS y Android.
-    // init_point es el fallback para navegador de escritorio.
+    // mobile_init_point abre la app de MP en iOS/Android.
+    // El cast a any es necesario porque el SDK no expone ese campo en sus tipos.
+    const resultadoRaw = resultado as any;
+    const urlPago = resultadoRaw.mobile_init_point ?? resultado.init_point;
+
     return NextResponse.json({
-      urlPago: resultado.mobile_init_point ?? resultado.init_point,
+      urlPago,
       preferenciaId: referenciaExterna,
     });
   } catch (error) {
