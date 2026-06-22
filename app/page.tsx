@@ -91,23 +91,20 @@ function ContenidoPortal() {
 
       const datos = await respuesta.json();
 
-      // --- ESTRATEGIA PARA APERTURA DE LA APP DE MERCADO PAGO EN OMADA ---
-      if (macAp && parametros.get("clientMac")) {
-        // Obtenemos la dirección IP/Puerto de la controladora Omada que viene en la URL
-        // Si no está presente, usa la IP estándar por defecto
-        const omadaTarget = parametros.get("target") || "192.168.0.1:8088";
-        
-        // Limpiamos protocolos sobrantes en caso de que vengan incluidos
-        const baseOmada = omadaTarget.replace("http://", "").replace("https://", "");
-
-        // Armamos la URL redirigiendo al portal interno para forzar la salida del mininavegador cautivo
-        const urlAutenticacionOmada = `http://${baseOmada}/portal/auth?clientMac=${encodeURIComponent(macCliente)}&apMac=${encodeURIComponent(macAp)}&redirectUrl=${encodeURIComponent(datos.urlPago)}`;
-        
-        window.location.href = urlAutenticacionOmada;
+      // --- SOLUCIÓN COMPATIBLE UNIVERSAL ---
+      // El atributo target="_blank" combinado con una URL externa segura en producción
+      // le indica al mini-navegador del celular que no puede procesar la ventana,
+      // obligándolo a derivar la acción a Safari (iOS) o Chrome (Android).
+      const nuevaVentana = window.open(datos.urlPago, "_blank");
+      
+      if (nuevaVentana) {
+        // Si el navegador permitió abrir la pestaña/app externa, quitamos el estado de carga
+        setCargando(false);
       } else {
-        // Navegación directa en caso de pruebas locales
+        // Si el mini-navegador bloqueó el pop-up, lo redirigimos en la misma ventana como resguardo
         window.location.href = datos.urlPago;
       }
+
     } catch (e) {
       setError("Hubo un problema al iniciar el pago. Probá de nuevo.");
       setCargando(false);
@@ -145,7 +142,7 @@ function ContenidoPortal() {
           disabled={cargando}
           className="w-full mt-5 py-3.5 rounded-xl text-[15px] font-medium bg-[#6E3FA3] hover:bg-[#5A3286] active:scale-[0.98] transition disabled:opacity-60"
         >
-          {cargando ? "Abriendo el pago..." : "Pagar y conectarme"}
+          {cargando ? "Abriendo Mercado Pago..." : "Pagar y conectarme"}
         </button>
 
         <p className="text-[11px] text-[#5A5A60] text-center mt-4">
