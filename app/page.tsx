@@ -17,6 +17,7 @@ function ContenidoPortal() {
   const [planSeleccionado, setPlanSeleccionado] = useState(PLANES[1].id);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [urlPago, setUrlPago] = useState<string | null>(null);
 
   const [mostrarCodigo, setMostrarCodigo] = useState(false);
   const [codigo, setCodigo] = useState("");
@@ -69,9 +70,11 @@ function ContenidoPortal() {
     }
   }
 
-  async function pagarYConectarme() {
+  // Paso 1: preparar el pago (llamada al servidor)
+  async function prepararPago() {
     setError(null);
     setCargando(true);
+    setUrlPago(null);
     try {
       const respuesta = await fetch("/api/crear-pago", {
         method: "POST",
@@ -86,15 +89,13 @@ function ContenidoPortal() {
         }),
       });
 
-      if (!respuesta.ok) {
-        throw new Error("No pudimos iniciar el pago");
-      }
+      if (!respuesta.ok) throw new Error("No pudimos iniciar el pago");
 
       const datos = await respuesta.json();
-      window.location.href = datos.urlPago;
-
+      setUrlPago(datos.urlPago);
     } catch (e) {
       setError("Hubo un problema al iniciar el pago. Probá de nuevo.");
+    } finally {
       setCargando(false);
     }
   }
@@ -129,7 +130,7 @@ function ContenidoPortal() {
           {PLANES.map((plan) => (
             <button
               key={plan.id}
-              onClick={() => setPlanSeleccionado(plan.id)}
+              onClick={() => { setPlanSeleccionado(plan.id); setUrlPago(null); }}
               className={`flex items-center justify-between rounded-2xl px-4 py-3.5 text-left transition border ${
                 planSeleccionado === plan.id
                   ? "bg-[#211A2B] border-[#8B5FBF]"
@@ -151,14 +152,23 @@ function ContenidoPortal() {
           <p className="text-sm text-red-400 mt-4 text-center">{error}</p>
         )}
 
-        {/* BOTÓN DE PAGO */}
-        <button
-          onClick={() => pagarYConectarme()}
-          disabled={cargando}
-          className="w-full mt-5 py-3.5 rounded-xl text-[15px] font-medium bg-[#6E3FA3] hover:bg-[#5A3286] active:scale-[0.98] transition disabled:opacity-60"
-        >
-          {cargando ? "Abriendo pago..." : "Pagar y conectarme"}
-        </button>
+        {/* BOTÓN DE PAGO - dos pasos para que iOS detecte el toque del usuario */}
+        {!urlPago ? (
+          <button
+            onClick={prepararPago}
+            disabled={cargando}
+            className="w-full mt-5 py-3.5 rounded-xl text-[15px] font-medium bg-[#6E3FA3] hover:bg-[#5A3286] active:scale-[0.98] transition disabled:opacity-60"
+          >
+            {cargando ? "Preparando pago..." : "Pagar y conectarme"}
+          </button>
+        ) : (
+          <a
+            href={urlPago}
+            className="block w-full mt-5 py-3.5 rounded-xl text-[15px] font-medium bg-[#6E3FA3] hover:bg-[#5A3286] active:scale-[0.98] transition text-center text-white no-underline"
+          >
+            Tocar aquí para pagar
+          </a>
+        )}
 
         <p className="text-[11px] text-[#5A5A60] text-center mt-4">
           Al continuar aceptás los términos de servicio · Surcante
