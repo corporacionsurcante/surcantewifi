@@ -90,7 +90,24 @@ function ContenidoPortal() {
       }
 
       const datos = await respuesta.json();
-      window.location.href = datos.urlPago;
+
+      // --- ESTRATEGIA PARA APERTURA DE LA APP DE MERCADO PAGO EN OMADA ---
+      if (macAp && parametros.get("clientMac")) {
+        // Obtenemos la dirección IP/Puerto de la controladora Omada que viene en la URL
+        // Si no está presente, usa la IP estándar por defecto
+        const omadaTarget = parametros.get("target") || "192.168.0.1:8088";
+        
+        // Limpiamos protocolos sobrantes en caso de que vengan incluidos
+        const baseOmada = omadaTarget.replace("http://", "").replace("https://", "");
+
+        // Armamos la URL redirigiendo al portal interno para forzar la salida del mininavegador cautivo
+        const urlAutenticacionOmada = `http://${baseOmada}/portal/auth?clientMac=${encodeURIComponent(macCliente)}&apMac=${encodeURIComponent(macAp)}&redirectUrl=${encodeURIComponent(datos.urlPago)}`;
+        
+        window.location.href = urlAutenticacionOmada;
+      } else {
+        // Navegación directa en caso de pruebas locales
+        window.location.href = datos.urlPago;
+      }
     } catch (e) {
       setError("Hubo un problema al iniciar el pago. Probá de nuevo.");
       setCargando(false);
