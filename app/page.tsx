@@ -69,7 +69,7 @@ function ContenidoPortal() {
     }
   }
 
-  async function pagarYConectarme(usarAppDirecta: boolean = false) {
+  async function pagarYConectarme() {
     setError(null);
     setCargando(true);
     try {
@@ -91,13 +91,7 @@ function ContenidoPortal() {
       }
 
       const datos = await respuesta.json();
-      
-      if (usarAppDirecta) {
-        window.open(datos.urlPago, "_blank");
-        setCargando(false);
-      } else {
-        window.location.href = datos.urlPago;
-      }
+      window.location.href = datos.urlPago;
 
     } catch (e) {
       setError("Hubo un problema al iniciar el pago. Probá de nuevo.");
@@ -157,26 +151,14 @@ function ContenidoPortal() {
           <p className="text-sm text-red-400 mt-4 text-center">{error}</p>
         )}
 
-        {/* BOTONES DE PAGO */}
+        {/* BOTÓN DE PAGO */}
         <button
-          onClick={() => pagarYConectarme(false)}
+          onClick={() => pagarYConectarme()}
           disabled={cargando}
           className="w-full mt-5 py-3.5 rounded-xl text-[15px] font-medium bg-[#6E3FA3] hover:bg-[#5A3286] active:scale-[0.98] transition disabled:opacity-60"
         >
-          {cargando ? "Abriendo pago..." : "Pagar en este navegador"}
+          {cargando ? "Abriendo pago..." : "Pagar y conectarme"}
         </button>
-
-        <button
-          onClick={() => pagarYConectarme(true)}
-          disabled={cargando}
-          className="w-full mt-2.5 py-3 rounded-xl text-[13px] font-medium bg-[#18181B] text-white border border-[#8B5FBF] hover:bg-[#211A2B] active:scale-[0.98] transition disabled:opacity-60"
-        >
-          {cargando ? "Forzando..." : "📱 Abrir en la App de Mercado Pago"}
-        </button>
-
-        <p className="text-[11px] text-[#5A5A60] text-center mt-2.5 px-2">
-          Nota: Si el primer botón falla o no te deja usar tu cuenta, usá el botón de la <b>App de Mercado Pago</b> para saltar el bloqueo.
-        </p>
 
         <p className="text-[11px] text-[#5A5A60] text-center mt-4">
           Al continuar aceptás los términos de servicio · Surcante
