@@ -15,7 +15,7 @@ export default function PaginaPortal() {
 function ContenidoPortal() {
   const parametros = useSearchParams();
   const [planSeleccionado, setPlanSeleccionado] = useState(PLANES[1].id);
-  const [cargando, setCargando] = useState(false);
+  const [cargando, setCargando] = useState<"mp" | "nave" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [mostrarCodigo, setMostrarCodigo] = useState(false);
@@ -40,6 +40,36 @@ function ContenidoPortal() {
   const urlRedireccion = parametros.get("redirectUrl") ?? "";
   const nombreSsid = parametros.get("ssidName") ?? "";
   const nombreSitio = parametros.get("site") ?? "";
+
+  async function pagar(medio: "mp" | "nave") {
+    setError(null);
+    setCargando(medio);
+    try {
+      const endpoint =
+        medio === "nave" ? "/api/crear-pago-nave" : "/api/crear-pago";
+
+      const respuesta = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          planId: planSeleccionado,
+          clientMac: macCliente,
+          apMac: macAp,
+          redirectUrl: urlRedireccion,
+          ssidName: nombreSsid,
+          site: nombreSitio,
+        }),
+      });
+
+      if (!respuesta.ok) throw new Error("Error al iniciar el pago");
+
+      const datos = await respuesta.json();
+      window.location.href = datos.urlPago;
+    } catch (e) {
+      setError("Hubo un problema al iniciar el pago. Probá de nuevo.");
+      setCargando(null);
+    }
+  }
 
   async function canjearCodigo() {
     setErrorCodigo(null);
@@ -69,32 +99,7 @@ function ContenidoPortal() {
     }
   }
 
-  async function pagarYConectarme() {
-    setError(null);
-    setCargando(true);
-    try {
-      const respuesta = await fetch("/api/crear-pago-nave", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          planId: planSeleccionado,
-          clientMac: macCliente,
-          apMac: macAp,
-          redirectUrl: urlRedireccion,
-          ssidName: nombreSsid,
-          site: nombreSitio,
-        }),
-      });
-
-      if (!respuesta.ok) throw new Error("No pudimos iniciar el pago");
-
-      const datos = await respuesta.json();
-      window.location.href = datos.urlPago;
-    } catch (e) {
-      setError("Hubo un problema al iniciar el pago. Probá de nuevo.");
-      setCargando(false);
-    }
-  }
+  const ocupado = cargando !== null;
 
   return (
     <main className="min-h-screen flex flex-col items-center px-5 py-9">
@@ -144,12 +149,26 @@ function ContenidoPortal() {
           <p className="text-sm text-red-400 mt-4 text-center">{error}</p>
         )}
 
+        <p className="text-xs text-[#A0A0A8] text-center mt-5 mb-3">
+          Elegí cómo pagar
+        </p>
+
+        {/* Botón Nave / Galicia */}
         <button
-          onClick={pagarYConectarme}
-          disabled={cargando}
-          className="w-full mt-5 py-3.5 rounded-xl text-[15px] font-medium bg-[#6E3FA3] hover:bg-[#5A3286] active:scale-[0.98] transition disabled:opacity-60"
+          onClick={() => pagar("nave")}
+          disabled={ocupado}
+          className="w-full py-3.5 rounded-xl text-[15px] font-medium bg-[#6E3FA3] hover:bg-[#5A3286] active:scale-[0.98] transition disabled:opacity-60 mb-2.5"
         >
-          {cargando ? "Abriendo pago..." : "Pagar y conectarme"}
+          {cargando === "nave" ? "Abriendo pago..." : "Pagar con Nave / Galicia"}
+        </button>
+
+        {/* Botón Mercado Pago */}
+        <button
+          onClick={() => pagar("mp")}
+          disabled={ocupado}
+          className="w-full py-3.5 rounded-xl text-[15px] font-medium bg-[#18181B] border border-[#2A2A2E] hover:bg-[#211A2B] active:scale-[0.98] transition disabled:opacity-60"
+        >
+          {cargando === "mp" ? "Abriendo pago..." : "Pagar con Mercado Pago"}
         </button>
 
         <p className="text-[11px] text-[#5A5A60] text-center mt-4">
