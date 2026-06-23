@@ -93,6 +93,7 @@ export async function POST(solicitud: NextRequest) {
     return NextResponse.json({
       urlPago,
       preferenciaId: referenciaExterna,
+      mpPreferenceId: idPreferencia,
     });
   } catch (error) {
     console.error("[crear-pago] Error al crear la preferencia:", error);
