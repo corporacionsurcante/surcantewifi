@@ -1,0 +1,71 @@
+import { NextRequest, NextResponse } from "next/server";
+import { MercadoPagoConfig, Payment } from "mercadopago";
+import { buscarPlan } from "@/lib/planes";
+import { autorizarClienteEnOmada } from "@/lib/omada";
+
+const cliente = new MercadoPagoConfig({
+  accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN!,
+});
+
+export async function POST(solicitud: NextRequest) {
+  const cuerpo = await solicitud.json();
+  const {
+    formData,    // datos del brick (token de tarjeta, método de pago, etc.)
+    planId,
+    clientMac,
+    apMac,
+    ssidName,
+    site,
+  } = cuerpo;
+
+  const plan = buscarPlan(planId);
+  if (!plan) {
+    return NextResponse.json({ error: "Plan inválido" }, { status: 400 });
+  }
+
+  try {
+    const pago = new Payment(cliente);
+    const resultado = await pago.create({
+      body: {
+        ...formData,
+        transaction_amount: plan.precio,
+        description: `WiFi Surcante - ${plan.nombre}`,
+        installments: 1,
+      },
+    });
+
+    if (
+      resultado.status === "approved" ||
+      resultado.status_detail === "accredited"
+    ) {
+      // Pago aprobado: autorizamos el acceso en Omada
+      await autorizarClienteEnOmada({
+        clientMac: clientMac ?? "",
+        apMac: apMac ?? "",
+        ssidName: ssidName ?? "",
+        site: site ?? "",
+        minutos: plan.duracionMinutos,
+      });
+
+      return NextResponse.json({
+        exito: true,
+        estado: resultado.status,
+        planNombre: plan.nombre,
+        duracionMinutos: plan.duracionMinutos,
+      });
+    }
+
+    // Pago pendiente o rechazado
+    return NextResponse.json({
+      exito: false,
+      estado: resultado.status,
+      detalle: resultado.status_detail,
+    });
+  } catch (error) {
+    console.error("[procesar-pago] Error:", error);
+    return NextResponse.json(
+      { error: "No pudimos procesar el pago" },
+      { status: 500 }
+    );
+  }
+}
