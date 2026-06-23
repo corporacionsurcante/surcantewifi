@@ -92,7 +92,22 @@ function ContenidoPortal() {
       if (!respuesta.ok) throw new Error("No pudimos iniciar el pago");
 
       const datos = await respuesta.json();
-      setUrlPago(datos.urlPago);
+
+      // --- INICIO DEL HACK PARA EL PORTAL CAUTIVO EN ANDROID ---
+      const esAndroid = /Android/i.test(navigator.userAgent);
+
+      if (esAndroid) {
+        // Captura el dominio exacto y los parámetros query actuales (?clientMac, etc.)
+        const rutaCompleta = window.location.host + window.location.pathname + window.location.search;
+        
+        // Forzamos a Android a cerrar el mini-navegador y reabrir todo esto en Google Chrome original
+        window.location.href = `intent://${rutaCompleta}#Intent;scheme=https;package=com.android.chrome;end`;
+      } else {
+        // Si es iOS o PC, guardamos la url para el segundo botón de confirmación
+        setUrlPago(datos.urlPago);
+      }
+      // --- FIN DEL HACK ---
+
     } catch (e) {
       setError("Hubo un problema al iniciar el pago. Probá de nuevo.");
     } finally {
