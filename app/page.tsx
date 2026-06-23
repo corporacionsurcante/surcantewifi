@@ -2,7 +2,6 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { initMercadoPago, Payment } from "@mercadopago/sdk-react";
 import { PLANES } from "@/lib/planes";
 
 export default function PaginaPortal() {
@@ -16,20 +15,17 @@ export default function PaginaPortal() {
 function ContenidoPortal() {
   const parametros = useSearchParams();
   const [planSeleccionado, setPlanSeleccionado] = useState(PLANES[1].id);
-  const [preferenceId, setPreferenceId] = useState<string | null>(null);
-  const [cargandoPreferencia, setCargandoPreferencia] = useState(false);
-  const [resultado, setResultado] = useState<"aprobado" | "error" | null>(null);
-  const [macDePrueba, setMacDePrueba] = useState("");
+  const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [mostrarCodigo, setMostrarCodigo] = useState(false);
   const [codigo, setCodigo] = useState("");
   const [errorCodigo, setErrorCodigo] = useState<string | null>(null);
   const [canjeando, setCanjeando] = useState(false);
 
+  const [macDePrueba, setMacDePrueba] = useState("");
+
   useEffect(() => {
-    initMercadoPago(process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY!, {
-      locale: "es-AR",
-    });
     const clave = "surcante-mac-prueba";
     let mac = window.localStorage.getItem(clave);
     if (!mac) {
@@ -44,54 +40,6 @@ function ContenidoPortal() {
   const urlRedireccion = parametros.get("redirectUrl") ?? "";
   const nombreSsid = parametros.get("ssidName") ?? "";
   const nombreSitio = parametros.get("site") ?? "";
-  const planActual = PLANES.find((p) => p.id === planSeleccionado) ?? PLANES[1];
-
-  async function abrirPago() {
-    setCargandoPreferencia(true);
-    setPreferenceId(null);
-    try {
-      const respuesta = await fetch("/api/crear-pago", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          planId: planSeleccionado,
-          clientMac: macCliente,
-          apMac: macAp,
-          redirectUrl: urlRedireccion,
-          ssidName: nombreSsid,
-          site: nombreSitio,
-        }),
-      });
-      const datos = await respuesta.json();
-      // crear-pago ahora debe devolver también el preferenceId de MP
-      setPreferenceId(datos.mpPreferenceId);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setCargandoPreferencia(false);
-    }
-  }
-
-  async function onSubmitBrick(formData: unknown) {
-    const respuesta = await fetch("/api/procesar-pago", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        formData,
-        planId: planSeleccionado,
-        clientMac: macCliente,
-        apMac: macAp,
-        ssidName: nombreSsid,
-        site: nombreSitio,
-      }),
-    });
-    const datos = await respuesta.json();
-    if (datos.exito) {
-      setResultado("aprobado");
-    } else {
-      setResultado("error");
-    }
-  }
 
   async function canjearCodigo() {
     setErrorCodigo(null);
@@ -121,18 +69,31 @@ function ContenidoPortal() {
     }
   }
 
-  if (resultado === "aprobado") {
-    return (
-      <main className="min-h-screen flex flex-col items-center justify-center px-5">
-        <div className="text-center">
-          <div className="w-16 h-16 rounded-full bg-green-600 flex items-center justify-center mx-auto mb-4">
-            <span className="text-white text-3xl">✓</span>
-          </div>
-          <p className="text-white text-xl font-medium mb-2">¡Pago aprobado!</p>
-          <p className="text-[#A0A0A8] text-sm">Ya podés navegar con {planActual.nombre}</p>
-        </div>
-      </main>
-    );
+  async function pagarYConectarme() {
+    setError(null);
+    setCargando(true);
+    try {
+      const respuesta = await fetch("/api/crear-pago", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          planId: planSeleccionado,
+          clientMac: macCliente,
+          apMac: macAp,
+          redirectUrl: urlRedireccion,
+          ssidName: nombreSsid,
+          site: nombreSitio,
+        }),
+      });
+
+      if (!respuesta.ok) throw new Error("No pudimos iniciar el pago");
+
+      const datos = await respuesta.json();
+      window.location.href = datos.urlPago;
+    } catch (e) {
+      setError("Hubo un problema al iniciar el pago. Probá de nuevo.");
+      setCargando(false);
+    }
   }
 
   return (
@@ -161,7 +122,7 @@ function ContenidoPortal() {
           {PLANES.map((plan) => (
             <button
               key={plan.id}
-              onClick={() => { setPlanSeleccionado(plan.id); setPreferenceId(null); }}
+              onClick={() => setPlanSeleccionado(plan.id)}
               className={`flex items-center justify-between rounded-2xl px-4 py-3.5 text-left transition border ${
                 planSeleccionado === plan.id
                   ? "bg-[#211A2B] border-[#8B5FBF]"
@@ -179,41 +140,17 @@ function ContenidoPortal() {
           ))}
         </div>
 
-        {!preferenceId ? (
-          <button
-            onClick={abrirPago}
-            disabled={cargandoPreferencia}
-            className="w-full mt-5 py-3.5 rounded-xl text-[15px] font-medium bg-[#6E3FA3] hover:bg-[#5A3286] active:scale-[0.98] transition disabled:opacity-60"
-          >
-            {cargandoPreferencia ? "Preparando..." : "Pagar y conectarme"}
-          </button>
-        ) : (
-          <div className="mt-5">
-            <Payment
-              initialization={{
-                amount: planActual.precio,
-                preferenceId,
-              }}
-              customization={{
-                paymentMethods: {
-                  ticket: "all",
-                  bankTransfer: "all",
-                  creditCard: "all",
-                  debitCard: "all",
-                  mercadoPago: "all",
-                },
-              }}
-              onSubmit={onSubmitBrick}
-              onError={(error) => console.error("[brick]", error)}
-            />
-          </div>
+        {error && (
+          <p className="text-sm text-red-400 mt-4 text-center">{error}</p>
         )}
 
-        {resultado === "error" && (
-          <p className="text-sm text-red-400 mt-4 text-center">
-            El pago no pudo procesarse. Intentá de nuevo.
-          </p>
-        )}
+        <button
+          onClick={pagarYConectarme}
+          disabled={cargando}
+          className="w-full mt-5 py-3.5 rounded-xl text-[15px] font-medium bg-[#6E3FA3] hover:bg-[#5A3286] active:scale-[0.98] transition disabled:opacity-60"
+        >
+          {cargando ? "Abriendo pago..." : "Pagar y conectarme"}
+        </button>
 
         <p className="text-[11px] text-[#5A5A60] text-center mt-4">
           Al continuar aceptás los términos de servicio · Surcante
