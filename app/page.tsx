@@ -73,7 +73,7 @@ function ContenidoPortal() {
     setError(null);
     setCargando(true);
     try {
-      const respuesta = await fetch("/api/crear-pago", {
+      const respuesta = await fetch("/api/crear-pago-nave", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
