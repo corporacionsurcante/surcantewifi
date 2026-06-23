@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { initMercadoPago, Payment } from "@mercadopago/sdk-react";
 import { PLANES } from "@/lib/planes";
 
 export default function PaginaPortal() {
@@ -15,18 +16,17 @@ export default function PaginaPortal() {
 function ContenidoPortal() {
   const parametros = useSearchParams();
   const [planSeleccionado, setPlanSeleccionado] = useState(PLANES[1].id);
-  const [cargando, setCargando] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [urlPago, setUrlPago] = useState<string | null>(null);
+  const [mostrarBrick, setMostrarBrick] = useState(false);
+  const [resultado, setResultado] = useState<"aprobado" | "error" | null>(null);
+  const [macDePrueba, setMacDePrueba] = useState("");
 
   const [mostrarCodigo, setMostrarCodigo] = useState(false);
   const [codigo, setCodigo] = useState("");
   const [errorCodigo, setErrorCodigo] = useState<string | null>(null);
   const [canjeando, setCanjeando] = useState(false);
 
-  const [macDePrueba, setMacDePrueba] = useState("");
-  
   useEffect(() => {
+    initMercadoPago(process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY!);
     const clave = "surcante-mac-prueba";
     let mac = window.localStorage.getItem(clave);
     if (!mac) {
@@ -38,9 +38,31 @@ function ContenidoPortal() {
 
   const macCliente = parametros.get("clientMac") || macDePrueba;
   const macAp = parametros.get("apMac") ?? "";
-  const urlRedireccion = parametros.get("redirectUrl") ?? "";
   const nombreSsid = parametros.get("ssidName") ?? "";
   const nombreSitio = parametros.get("site") ?? "";
+
+  const planActual = PLANES.find((p) => p.id === planSeleccionado) ?? PLANES[1];
+
+  async function onSubmitBrick(formData: unknown) {
+    const respuesta = await fetch("/api/procesar-pago", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        formData,
+        planId: planSeleccionado,
+        clientMac: macCliente,
+        apMac: macAp,
+        ssidName: nombreSsid,
+        site: nombreSitio,
+      }),
+    });
+    const datos = await respuesta.json();
+    if (datos.exito) {
+      setResultado("aprobado");
+    } else {
+      setResultado("error");
+    }
+  }
 
   async function canjearCodigo() {
     setErrorCodigo(null);
@@ -70,56 +92,27 @@ function ContenidoPortal() {
     }
   }
 
-  // Paso 1: preparar el pago (llamada al servidor)
-  async function prepararPago() {
-    setError(null);
-    setCargando(true);
-    setUrlPago(null);
-    try {
-      const respuesta = await fetch("/api/crear-pago", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          planId: planSeleccionado,
-          clientMac: macCliente,
-          apMac: macAp,
-          redirectUrl: urlRedireccion,
-          ssidName: nombreSsid,
-          site: nombreSitio,
-        }),
-      });
-
-      if (!respuesta.ok) throw new Error("No pudimos iniciar el pago");
-
-      const datos = await respuesta.json();
-
-      // --- INICIO DEL HACK PARA EL PORTAL CAUTIVO EN ANDROID ---
-      const esAndroid = /Android/i.test(navigator.userAgent);
-
-      if (esAndroid) {
-        // Captura el dominio exacto y los parámetros query actuales (?clientMac, etc.)
-        const rutaCompleta = window.location.host + window.location.pathname + window.location.search;
-        
-        // Forzamos a Android a cerrar el mini-navegador y reabrir todo esto en Google Chrome original
-        window.location.href = `intent://${rutaCompleta}#Intent;scheme=https;package=com.android.chrome;end`;
-      } else {
-        // Si es iOS o PC, guardamos la url para el segundo botón de confirmación
-        setUrlPago(datos.urlPago);
-      }
-      // --- FIN DEL HACK ---
-
-    } catch (e) {
-      setError("Hubo un problema al iniciar el pago. Probá de nuevo.");
-    } finally {
-      setCargando(false);
-    }
+  if (resultado === "aprobado") {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center px-5">
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-full bg-green-600 flex items-center justify-center mx-auto mb-4">
+            <span className="text-white text-3xl">✓</span>
+          </div>
+          <p className="text-white text-xl font-medium mb-2">¡Pago aprobado!</p>
+          <p className="text-[#A0A0A8] text-sm">
+            Ya podés navegar con {planActual.nombre}
+          </p>
+        </div>
+      </main>
+    );
   }
 
   return (
     <main className="min-h-screen flex flex-col items-center px-5 py-9">
       <div className="w-full max-w-sm">
-        
-        {/* CABECERA MARCA */}
+
+        {/* CABECERA */}
         <div className="text-center mb-7">
           <div className="flex items-center justify-center gap-1.5 mb-5">
             <span className="w-1.5 h-1.5 rounded-full bg-[#8B5FBF] animate-pulse" />
@@ -130,9 +123,7 @@ function ContenidoPortal() {
           <div className="w-16 h-16 rounded-full bg-[#6E3FA3] flex items-center justify-center mx-auto">
             <span className="text-white text-3xl font-medium">S</span>
           </div>
-          <p className="text-white text-xl font-medium mt-4 mb-1">
-            Surcante WiFi
-          </p>
+          <p className="text-white text-xl font-medium mt-4 mb-1">Surcante WiFi</p>
           <p className="text-[#A0A0A8] text-[13px]">Tu viaje, conectado</p>
         </div>
 
@@ -140,12 +131,12 @@ function ContenidoPortal() {
           Elegí tu plan
         </p>
 
-        {/* LISTADO DE PLANES */}
+        {/* PLANES */}
         <div className="flex flex-col gap-2.5">
           {PLANES.map((plan) => (
             <button
               key={plan.id}
-              onClick={() => { setPlanSeleccionado(plan.id); setUrlPago(null); }}
+              onClick={() => { setPlanSeleccionado(plan.id); setMostrarBrick(false); }}
               className={`flex items-center justify-between rounded-2xl px-4 py-3.5 text-left transition border ${
                 planSeleccionado === plan.id
                   ? "bg-[#211A2B] border-[#8B5FBF]"
@@ -163,33 +154,47 @@ function ContenidoPortal() {
           ))}
         </div>
 
-        {error && (
-          <p className="text-sm text-red-400 mt-4 text-center">{error}</p>
-        )}
-
-        {/* BOTÓN DE PAGO - dos pasos para que iOS detecte el toque del usuario */}
-        {!urlPago ? (
+        {/* BOTÓN O BRICK */}
+        {!mostrarBrick ? (
           <button
-            onClick={prepararPago}
-            disabled={cargando}
-            className="w-full mt-5 py-3.5 rounded-xl text-[15px] font-medium bg-[#6E3FA3] hover:bg-[#5A3286] active:scale-[0.98] transition disabled:opacity-60"
+            onClick={() => setMostrarBrick(true)}
+            className="w-full mt-5 py-3.5 rounded-xl text-[15px] font-medium bg-[#6E3FA3] hover:bg-[#5A3286] active:scale-[0.98] transition"
           >
-            {cargando ? "Preparando pago..." : "Pagar y conectarme"}
+            Pagar y conectarme
           </button>
         ) : (
-          <a
-            href={urlPago}
-            className="block w-full mt-5 py-3.5 rounded-xl text-[15px] font-medium bg-[#6E3FA3] hover:bg-[#5A3286] active:scale-[0.98] transition text-center text-white no-underline"
-          >
-            Tocar aquí para pagar
-          </a>
+          <div className="mt-5">
+            <Payment
+              initialization={{
+                amount: planActual.precio,
+                preferenceId: undefined,
+              }}
+              customization={{
+                paymentMethods: {
+                  ticket: "all",
+                  bankTransfer: "all",
+                  creditCard: "all",
+                  debitCard: "all",
+                  mercadoPago: "all",
+                },
+              }}
+              onSubmit={onSubmitBrick}
+              onError={(error) => console.error("[brick]", error)}
+            />
+          </div>
+        )}
+
+        {resultado === "error" && (
+          <p className="text-sm text-red-400 mt-4 text-center">
+            El pago no pudo procesarse. Intentá de nuevo.
+          </p>
         )}
 
         <p className="text-[11px] text-[#5A5A60] text-center mt-4">
           Al continuar aceptás los términos de servicio · Surcante
         </p>
 
-        {/* SECCIÓN CANJEAR CÓDIGO */}
+        {/* CÓDIGO DE ACCESO */}
         {!mostrarCodigo ? (
           <button
             onClick={() => setMostrarCodigo(true)}
