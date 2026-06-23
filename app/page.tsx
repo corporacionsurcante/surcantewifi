@@ -16,7 +16,8 @@ export default function PaginaPortal() {
 function ContenidoPortal() {
   const parametros = useSearchParams();
   const [planSeleccionado, setPlanSeleccionado] = useState(PLANES[1].id);
-  const [mostrarBrick, setMostrarBrick] = useState(false);
+  const [preferenceId, setPreferenceId] = useState<string | null>(null);
+  const [cargandoPreferencia, setCargandoPreferencia] = useState(false);
   const [resultado, setResultado] = useState<"aprobado" | "error" | null>(null);
   const [macDePrueba, setMacDePrueba] = useState("");
 
@@ -26,7 +27,9 @@ function ContenidoPortal() {
   const [canjeando, setCanjeando] = useState(false);
 
   useEffect(() => {
-    initMercadoPago(process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY!);
+    initMercadoPago(process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY!, {
+      locale: "es-AR",
+    });
     const clave = "surcante-mac-prueba";
     let mac = window.localStorage.getItem(clave);
     if (!mac) {
@@ -38,10 +41,36 @@ function ContenidoPortal() {
 
   const macCliente = parametros.get("clientMac") || macDePrueba;
   const macAp = parametros.get("apMac") ?? "";
+  const urlRedireccion = parametros.get("redirectUrl") ?? "";
   const nombreSsid = parametros.get("ssidName") ?? "";
   const nombreSitio = parametros.get("site") ?? "";
-
   const planActual = PLANES.find((p) => p.id === planSeleccionado) ?? PLANES[1];
+
+  async function abrirPago() {
+    setCargandoPreferencia(true);
+    setPreferenceId(null);
+    try {
+      const respuesta = await fetch("/api/crear-pago", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          planId: planSeleccionado,
+          clientMac: macCliente,
+          apMac: macAp,
+          redirectUrl: urlRedireccion,
+          ssidName: nombreSsid,
+          site: nombreSitio,
+        }),
+      });
+      const datos = await respuesta.json();
+      // crear-pago ahora debe devolver también el preferenceId de MP
+      setPreferenceId(datos.mpPreferenceId);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCargandoPreferencia(false);
+    }
+  }
 
   async function onSubmitBrick(formData: unknown) {
     const respuesta = await fetch("/api/procesar-pago", {
@@ -100,9 +129,7 @@ function ContenidoPortal() {
             <span className="text-white text-3xl">✓</span>
           </div>
           <p className="text-white text-xl font-medium mb-2">¡Pago aprobado!</p>
-          <p className="text-[#A0A0A8] text-sm">
-            Ya podés navegar con {planActual.nombre}
-          </p>
+          <p className="text-[#A0A0A8] text-sm">Ya podés navegar con {planActual.nombre}</p>
         </div>
       </main>
     );
@@ -112,7 +139,6 @@ function ContenidoPortal() {
     <main className="min-h-screen flex flex-col items-center px-5 py-9">
       <div className="w-full max-w-sm">
 
-        {/* CABECERA */}
         <div className="text-center mb-7">
           <div className="flex items-center justify-center gap-1.5 mb-5">
             <span className="w-1.5 h-1.5 rounded-full bg-[#8B5FBF] animate-pulse" />
@@ -131,12 +157,11 @@ function ContenidoPortal() {
           Elegí tu plan
         </p>
 
-        {/* PLANES */}
         <div className="flex flex-col gap-2.5">
           {PLANES.map((plan) => (
             <button
               key={plan.id}
-              onClick={() => { setPlanSeleccionado(plan.id); setMostrarBrick(false); }}
+              onClick={() => { setPlanSeleccionado(plan.id); setPreferenceId(null); }}
               className={`flex items-center justify-between rounded-2xl px-4 py-3.5 text-left transition border ${
                 planSeleccionado === plan.id
                   ? "bg-[#211A2B] border-[#8B5FBF]"
@@ -154,20 +179,20 @@ function ContenidoPortal() {
           ))}
         </div>
 
-        {/* BOTÓN O BRICK */}
-        {!mostrarBrick ? (
+        {!preferenceId ? (
           <button
-            onClick={() => setMostrarBrick(true)}
-            className="w-full mt-5 py-3.5 rounded-xl text-[15px] font-medium bg-[#6E3FA3] hover:bg-[#5A3286] active:scale-[0.98] transition"
+            onClick={abrirPago}
+            disabled={cargandoPreferencia}
+            className="w-full mt-5 py-3.5 rounded-xl text-[15px] font-medium bg-[#6E3FA3] hover:bg-[#5A3286] active:scale-[0.98] transition disabled:opacity-60"
           >
-            Pagar y conectarme
+            {cargandoPreferencia ? "Preparando..." : "Pagar y conectarme"}
           </button>
         ) : (
           <div className="mt-5">
             <Payment
               initialization={{
                 amount: planActual.precio,
-                preferenceId: undefined,
+                preferenceId,
               }}
               customization={{
                 paymentMethods: {
@@ -194,7 +219,6 @@ function ContenidoPortal() {
           Al continuar aceptás los términos de servicio · Surcante
         </p>
 
-        {/* CÓDIGO DE ACCESO */}
         {!mostrarCodigo ? (
           <button
             onClick={() => setMostrarCodigo(true)}
