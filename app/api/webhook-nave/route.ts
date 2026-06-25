@@ -10,10 +10,14 @@ import { autorizarClienteEnOmada } from "@/lib/omada";
 // Nave reintenta hasta 5 veces si no recibimos HTTP 200.
 // ──────────────────────────────────────────────────────────────
 
+const esSandbox = process.env.NAVE_SANDBOX === "true";
+
+const NAVE_AUTH_URL = esSandbox
+  ? "https://homoservices.apinaranja.com/security-ms/api/security/auth0/b2b/m2msPrivate"
+  : "https://services.apinaranja.com/security-ms/api/security/auth0/b2b/m2msPrivate";
+
 async function obtenerTokenNave(): Promise<string> {
-  const respuesta = await fetch(
-    "https://services.apinaranja.com/security-ms/api/security/auth0/b2b/m2msPrivate",
-    {
+  const respuesta = await fetch(NAVE_AUTH_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
