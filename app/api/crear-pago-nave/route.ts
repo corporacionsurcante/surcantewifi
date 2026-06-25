@@ -12,12 +12,21 @@ import { guardarPagoPendiente } from "@/lib/pagos";
 //   NAVE_CLIENT_SECRET   → client_secret provisto por Nave
 //   NAVE_POS_ID          → ID del punto de venta en Nave
 //   NAVE_AUDIENCE        → https://naranja.com/ranty/merchants/api
+//   NAVE_SANDBOX         → "true" para usar sandbox, vacío para producción
 // ──────────────────────────────────────────────────────────────
 
+const esSandbox = process.env.NAVE_SANDBOX === "true";
+
+const NAVE_AUTH_URL = esSandbox
+  ? "https://homoservices.apinaranja.com/security-ms/api/security/auth0/b2b/m2msPrivate"
+  : "https://services.apinaranja.com/security-ms/api/security/auth0/b2b/m2msPrivate";
+
+const NAVE_PAYMENT_URL = esSandbox
+  ? "https://api-sandbox.ranty.io/api/payment_request/ecommerce"
+  : "https://api.ranty.io/api/payment_request/ecommerce";
+
 async function obtenerTokenNave(): Promise<string> {
-  const respuesta = await fetch(
-    "https://services.apinaranja.com/security-ms/api/security/auth0/b2b/m2msPrivate",
-    {
+  const respuesta = await fetch(NAVE_AUTH_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -52,9 +61,7 @@ export async function POST(solicitud: NextRequest) {
   try {
     const token = await obtenerTokenNave();
 
-    const respuesta = await fetch(
-      "https://api.ranty.io/api/payment_request/ecommerce",
-      {
+    const respuesta = await fetch(NAVE_PAYMENT_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
