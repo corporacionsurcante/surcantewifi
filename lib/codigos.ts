@@ -1,72 +1,74 @@
-// ──────────────────────────────────────────────────────────────
-// ALMACENAMIENTO TEMPORAL: estos códigos viven en la memoria del
-// servidor mientras está corriendo. Esto es suficiente para probar
-// el flujo completo, pero en producción real conviene moverlo a
-// una base de datos (por ejemplo Vercel KV o Postgres), porque la
-// memoria se reinicia cada vez que el servidor se actualiza o
-// reinicia, y los códigos generados se perderían.
-//
-// Lo dejamos así por ahora para que puedas probar todo el flujo
-// sin necesidad de configurar una base de datos todavía.
-// ──────────────────────────────────────────────────────────────
+import { Redis } from "@upstash/redis";
 
-export type CodigoAcceso = {
+const redis = Redis.fromEnv();
+
+export type Codigo = {
   codigo: string;
   creadoEn: number;
   usadoEn: number | null;
-  macDispositivo: string | null;
-  nota: string;
+  clientMac: string | null;
+  creadoPor: string; // iniciales del admin que lo generó
 };
 
-const codigos: Map<string, CodigoAcceso> = new Map();
+const PREFIJO_CODIGO = "codigo:";
+const SET_CODIGOS = "codigos:todos";
 
-export function generarCodigo(nota: string): CodigoAcceso {
-  const codigo = crearCodigoLegible();
-  const nuevo: CodigoAcceso = {
-    codigo,
+function generarCodigo(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const parte = () =>
+    Array.from({ length: 4 }, () =>
+      chars[Math.floor(Math.random() * chars.length)]
+    ).join("");
+  return `${parte()}-${parte()}`;
+}
+
+export async function crearCodigo(creadoPor: string = "ADMIN"): Promise<Codigo> {
+  const codigo: Codigo = {
+    codigo: generarCodigo(),
     creadoEn: Date.now(),
     usadoEn: null,
-    macDispositivo: null,
-    nota,
+    clientMac: null,
+    creadoPor,
   };
-  codigos.set(codigo, nuevo);
-  return nuevo;
+  const key = `${PREFIJO_CODIGO}${codigo.codigo}`;
+  await redis.set(key, JSON.stringify(codigo), { ex: 60 * 60 * 24 * 365 }); // 1 año
+  await redis.sadd(SET_CODIGOS, codigo.codigo);
+  return codigo;
 }
 
-export function listarCodigos(): CodigoAcceso[] {
-  return Array.from(codigos.values()).sort((a, b) => b.creadoEn - a.creadoEn);
-}
+export async function usarCodigo(
+  codigoStr: string,
+  clientMac: string
+): Promise<{ exito: boolean; motivo?: string }> {
+  const key = `${PREFIJO_CODIGO}${codigoStr.toUpperCase()}`;
+  const datos = await redis.get<string>(key);
+  if (!datos) return { exito: false, motivo: "Código inválido" };
 
-// Intenta usar un código. Devuelve null si no existe.
-// Si ya fue usado en OTRO dispositivo, devuelve el código con
-// un indicador de rechazo. Si es la primera vez, o si el mismo
-// dispositivo vuelve a conectarse, lo autoriza.
-export function usarCodigo(
-  codigo: string,
-  macDispositivo: string
-): { exito: boolean; motivo?: string } {
-  const entrada = codigos.get(codigo.toUpperCase().trim());
-  if (!entrada) {
-    return { exito: false, motivo: "Código no encontrado" };
+  const codigo: Codigo =
+    typeof datos === "string" ? JSON.parse(datos) : (datos as Codigo);
+
+  if (codigo.usadoEn) {
+    return { exito: false, motivo: "Este código ya fue utilizado" };
   }
-  if (entrada.usadoEn && entrada.macDispositivo !== macDispositivo) {
-    return { exito: false, motivo: "Este código ya fue usado en otro dispositivo" };
-  }
-  if (!entrada.usadoEn) {
-    entrada.usadoEn = Date.now();
-    entrada.macDispositivo = macDispositivo;
-  }
+
+  codigo.usadoEn = Date.now();
+  codigo.clientMac = clientMac;
+  await redis.set(key, JSON.stringify(codigo), { ex: 60 * 60 * 24 * 365 });
   return { exito: true };
 }
 
-function crearCodigoLegible(): string {
-  // Evita caracteres confusos como 0/O o 1/I para que sea fácil
-  // de transcribir a mano o leer en voz alta.
-  const alfabeto = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let resultado = "";
-  for (let i = 0; i < 8; i++) {
-    resultado += alfabeto[Math.floor(Math.random() * alfabeto.length)];
-    if (i === 3) resultado += "-";
+export async function listarTodosLosCodigos(): Promise<Codigo[]> {
+  const ids = await redis.smembers(SET_CODIGOS);
+  if (!ids || ids.length === 0) return [];
+  const codigos: Codigo[] = [];
+  for (const id of ids) {
+    const key = `${PREFIJO_CODIGO}${id}`;
+    const datos = await redis.get<string>(key);
+    if (datos) {
+      codigos.push(
+        typeof datos === "string" ? JSON.parse(datos) : (datos as Codigo)
+      );
+    }
   }
-  return resultado;
+  return codigos.sort((a, b) => b.creadoEn - a.creadoEn);
 }
