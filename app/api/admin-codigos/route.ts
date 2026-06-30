@@ -1,25 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generarCodigo, listarCodigos } from "@/lib/codigos";
+import { crearCodigo, listarTodosLosCodigos } from "@/lib/codigos";
 
-function estaAutorizado(solicitud: NextRequest): boolean {
-  const claveEnviada = solicitud.headers.get("x-clave-admin");
-  const claveReal = process.env.CLAVE_ADMIN;
-  return Boolean(claveReal) && claveEnviada === claveReal;
+function verificarAdmin(solicitud: NextRequest): boolean {
+  const clave = solicitud.headers.get("x-admin-key");
+  return clave === process.env.CLAVE_ADMIN;
 }
 
 export async function GET(solicitud: NextRequest) {
-  if (!estaAutorizado(solicitud)) {
+  if (!verificarAdmin(solicitud)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
-  return NextResponse.json({ codigos: listarCodigos() });
+  const codigos = await listarTodosLosCodigos();
+  return NextResponse.json({ codigos });
 }
 
 export async function POST(solicitud: NextRequest) {
-  if (!estaAutorizado(solicitud)) {
+  if (!verificarAdmin(solicitud)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
-  const cuerpo = await solicitud.json();
-  const nota = typeof cuerpo.nota === "string" ? cuerpo.nota : "";
-  const nuevoCodigo = generarCodigo(nota);
-  return NextResponse.json({ codigo: nuevoCodigo });
+  const cuerpo = await solicitud.json().catch(() => ({}));
+  const creadoPor = cuerpo.creadoPor ?? "ADMIN";
+  const cantidad = Math.min(Number(cuerpo.cantidad) || 1, 50);
+  const codigos = [];
+  for (let i = 0; i < cantidad; i++) {
+    codigos.push(await crearCodigo(creadoPor));
+  }
+  return NextResponse.json({ codigos });
 }
