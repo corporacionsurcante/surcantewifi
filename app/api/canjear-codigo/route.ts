@@ -1,73 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listarTodosLosPagos } from "@/lib/pagos";
-import { listarTodosLosCodigos } from "@/lib/codigos";
-import { PLANES } from "@/lib/planes";
+import { usarCodigo } from "@/lib/codigos";
+import { autorizarClienteEnOmada } from "@/lib/omada";
 
-function verificarAdmin(solicitud: NextRequest): boolean {
-  const clave = solicitud.headers.get("x-admin-key");
-  return clave === process.env.CLAVE_ADMIN;
-}
+const UN_ANIO_EN_MINUTOS = 60 * 24 * 365;
 
-export async function GET(solicitud: NextRequest) {
-  if (!verificarAdmin(solicitud)) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+export async function POST(solicitud: NextRequest) {
+  const cuerpo = await solicitud.json();
+  const { codigo, clientMac, apMac, ssidName, site } = cuerpo;
+
+  if (!codigo || !clientMac) {
+    return NextResponse.json(
+      { exito: false, motivo: "Faltan datos" },
+      { status: 400 }
+    );
   }
 
-  const [pagos, codigos] = await Promise.all([
-    listarTodosLosPagos(),
-    listarTodosLosCodigos(),
-  ]);
+  const resultado = await usarCodigo(codigo, clientMac);
 
-  const pagosConfirmados = pagos.filter((p) => p.confirmadoEn !== null);
+  if (resultado.exito) {
+    const resultadoOmada = await autorizarClienteEnOmada({
+      clientMac,
+      apMac: apMac ?? "",
+      ssidName: ssidName ?? "",
+      site: site ?? "",
+      minutos: UN_ANIO_EN_MINUTOS,
+    });
 
-  const recaudacionTotal = pagosConfirmados.reduce(
-    (acc, p) => acc + (p.monto ?? PLANES.find((pl) => pl.id === p.planId)?.precio ?? 0),
-    0
-  );
+    if (!resultadoOmada.exito) {
+      console.error(
+        "[canjear-codigo] El código se validó pero Omada no autorizó el acceso:",
+        resultadoOmada.motivo,
+        "MAC:",
+        clientMac
+      );
+    }
+  }
 
-  const porPlan = PLANES.map((plan) => {
-    const pagosDelPlan = pagosConfirmados.filter((p) => p.planId === plan.id);
-    return {
-      plan: plan.nombre,
-      cantidad: pagosDelPlan.length,
-      total: pagosDelPlan.length * plan.precio,
-    };
-  });
-
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-  const pagosHoy = pagosConfirmados.filter(
-    (p) => p.confirmadoEn && p.confirmadoEn >= hoy.getTime()
-  );
-  const recaudacionHoy = pagosHoy.reduce(
-    (acc, p) => acc + (p.monto ?? PLANES.find((pl) => pl.id === p.planId)?.precio ?? 0),
-    0
-  );
-
-  return NextResponse.json({
-    resumen: {
-      totalPagos: pagosConfirmados.length,
-      recaudacionTotal,
-      recaudacionHoy,
-      pagosHoy: pagosHoy.length,
-      porPlan,
-    },
-    pagos: pagosConfirmados.map((p) => ({
-      id: p.preferenciaId,
-      mac: p.clientMac,
-      plan: PLANES.find((pl) => pl.id === p.planId)?.nombre ?? p.planId,
-      monto: p.monto ?? PLANES.find((pl) => pl.id === p.planId)?.precio ?? 0,
-      procesador: p.procesador ?? "mp",
-      fechaPago: p.confirmadoEn,
-      duracionMinutos: p.duracionMinutos,
-    })),
-    codigos: codigos.map((c) => ({
-      codigo: c.codigo,
-      estado: c.usadoEn ? "usado" : "disponible",
-      creadoPor: c.creadoPor,
-      creadoEn: c.creadoEn,
-      usadoEn: c.usadoEn,
-      mac: c.clientMac,
-    })),
-  });
+  return NextResponse.json(resultado);
 }
