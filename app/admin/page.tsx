@@ -37,10 +37,32 @@ export default function PanelAdmin() {
   const [resumen, setResumen] = useState<ResumenData | null>(null);
   const [pagos, setPagos] = useState<PagoData[]>([]);
   const [codigos, setCodigos] = useState<CodigoData[]>([]);
-  const [tab, setTab] = useState<"resumen" | "pagos" | "codigos">("resumen");
+  const [tab, setTab] = useState<"resumen" | "pagos" | "codigos" | "config">("resumen");
   const [generando, setGenerando] = useState(false);
   const [cantidadCodigos, setCantidadCodigos] = useState(1);
   const [creadoPor, setCreadoPor] = useState("");
+  const [config, setConfig] = useState({ nave: true, mp: true, whatsapp: true });
+  const [guardandoConfig, setGuardandoConfig] = useState(false);
+
+  async function cargarConfig() {
+    const r = await fetch("/api/config-publica");
+    const datos = await r.json();
+    setConfig(datos);
+  }
+
+  async function guardarConfig(nuevaConfig: typeof config) {
+    setGuardandoConfig(true);
+    try {
+      await fetch("/api/admin-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-key": clave },
+        body: JSON.stringify(nuevaConfig),
+      });
+      setConfig(nuevaConfig);
+    } finally {
+      setGuardandoConfig(false);
+    }
+  }
 
   const cargarDatos = useCallback(async (claveAdmin: string) => {
     try {
@@ -72,6 +94,7 @@ export default function PanelAdmin() {
       setResumen(datos.resumen);
       setPagos(datos.pagos);
       setCodigos(datos.codigos);
+      cargarConfig();
     } else {
       setError("Clave incorrecta");
     }
@@ -166,7 +189,7 @@ export default function PanelAdmin() {
 
         {/* TABS */}
         <div className="flex gap-2 mb-6">
-          {(["resumen", "pagos", "codigos"] as const).map((t) => (
+          {(["resumen", "pagos", "codigos", "config"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -176,7 +199,7 @@ export default function PanelAdmin() {
                   : "bg-[#18181B] text-[#A0A0A8] border border-[#2A2A2E]"
               }`}
             >
-              {t === "resumen" ? "Resumen" : t === "pagos" ? "Pagos" : "Códigos"}
+              {t === "resumen" ? "Resumen" : t === "pagos" ? "Pagos" : t === "codigos" ? "Códigos" : "Config"}
             </button>
           ))}
         </div>
@@ -306,6 +329,41 @@ export default function PanelAdmin() {
                 ))
               )}
             </div>
+          </div>
+        )}
+
+        {/* CONFIG */}
+        {tab === "config" && (
+          <div className="bg-[#18181B] border border-[#2A2A2E] rounded-2xl p-4 flex flex-col gap-4">
+            <p className="text-[#A0A0A8] text-xs">Medios de pago activos en la landing</p>
+
+            {[
+              { key: "nave", label: "Nave / Galicia" },
+              { key: "mp", label: "Mercado Pago" },
+              { key: "whatsapp", label: "WhatsApp" },
+            ].map(({ key, label }) => (
+              <div key={key} className="flex items-center justify-between">
+                <p className="text-white text-sm">{label}</p>
+                <button
+                  onClick={() => {
+                    const nueva = { ...config, [key]: !config[key as keyof typeof config] };
+                    guardarConfig(nueva);
+                  }}
+                  disabled={guardandoConfig}
+                  className={`w-12 h-6 rounded-full transition-colors relative ${
+                    config[key as keyof typeof config] ? "bg-[#6E3FA3]" : "bg-[#2A2A2E]"
+                  }`}
+                >
+                  <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${
+                    config[key as keyof typeof config] ? "left-6" : "left-0.5"
+                  }`} />
+                </button>
+              </div>
+            ))}
+
+            <p className="text-[#5A5A60] text-xs">
+              Los cambios se aplican de inmediato en la landing.
+            </p>
           </div>
         )}
 
