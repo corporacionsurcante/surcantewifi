@@ -15,7 +15,7 @@ export default function PaginaPortal() {
 function ContenidoPortal() {
   const parametros = useSearchParams();
   const [planSeleccionado, setPlanSeleccionado] = useState(PLANES[1].id);
-  const [cargando, setCargando] = useState<"mp" | "nave" | null>(null);
+  const [cargando, setCargando] = useState<"mp" | "nave" | "whatsapp" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [mostrarCodigo, setMostrarCodigo] = useState(false);
@@ -67,6 +67,37 @@ function ContenidoPortal() {
       window.location.href = datos.urlPago;
     } catch (e) {
       setError("Hubo un problema al iniciar el pago. Probá de nuevo.");
+      setCargando(null);
+    }
+  }
+
+  async function pagarPorWhatsApp() {
+    setError(null);
+    setCargando("whatsapp");
+    try {
+      const respuesta = await fetch("/api/crear-pago", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          planId: planSeleccionado,
+          clientMac: macCliente,
+          apMac: macAp,
+          redirectUrl: urlRedireccion,
+          ssidName: nombreSsid,
+          site: nombreSitio,
+        }),
+      });
+
+      if (!respuesta.ok) throw new Error("Error al iniciar el pago");
+
+      const datos = await respuesta.json();
+      const planActual = PLANES.find((p) => p.id === planSeleccionado) ?? PLANES[1];
+      const mensaje = `🛜 Mi link de pago WAIFAI\n${planActual.nombre} - $${planActual.precio.toLocaleString("es-AR")}\n\n${datos.urlPago}`;
+      const urlWhatsApp = `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
+      window.location.href = urlWhatsApp;
+    } catch (e) {
+      setError("Hubo un problema. Probá de nuevo.");
+    } finally {
       setCargando(null);
     }
   }
@@ -166,9 +197,18 @@ function ContenidoPortal() {
         <button
           onClick={() => pagar("mp")}
           disabled={ocupado}
-          className="w-full py-3.5 rounded-xl text-[15px] font-medium bg-[#18181B] border border-[#2A2A2E] hover:bg-[#211A2B] active:scale-[0.98] transition disabled:opacity-60"
+          className="w-full py-3.5 rounded-xl text-[15px] font-medium bg-[#18181B] border border-[#2A2A2E] hover:bg-[#211A2B] active:scale-[0.98] transition disabled:opacity-60 mb-2.5"
         >
           {cargando === "mp" ? "Abriendo pago..." : "Pagar con Mercado Pago"}
+        </button>
+
+        {/* Botón WhatsApp */}
+        <button
+          onClick={pagarPorWhatsApp}
+          disabled={ocupado}
+          className="w-full py-3.5 rounded-xl text-[15px] font-medium bg-[#18181B] border border-[#25D366] text-[#25D366] hover:bg-[#0d1f14] active:scale-[0.98] transition disabled:opacity-60"
+        >
+          {cargando === "whatsapp" ? "Generando link..." : "📲 Pagar por WhatsApp"}
         </button>
 
         <p className="text-[11px] text-[#5A5A60] text-center mt-4">
