@@ -24,6 +24,7 @@ function ContenidoPortal() {
   const [canjeando, setCanjeando] = useState(false);
 
   const [macDePrueba, setMacDePrueba] = useState("");
+  const [config, setConfig] = useState({ nave: true, mp: true, whatsapp: true });
 
   useEffect(() => {
     const clave = "surcante-mac-prueba";
@@ -33,6 +34,11 @@ function ContenidoPortal() {
       window.localStorage.setItem(clave, mac);
     }
     setMacDePrueba(mac);
+    // Carga la configuración de medios de pago activos
+    fetch("/api/config-publica")
+      .then((r) => r.json())
+      .then((datos) => setConfig(datos))
+      .catch(() => {});
   }, []);
 
   const macCliente = parametros.get("clientMac") || macDePrueba;
@@ -185,31 +191,37 @@ function ContenidoPortal() {
         </p>
 
         {/* Botón Nave / Galicia */}
-        <button
-          onClick={() => pagar("nave")}
-          disabled={ocupado}
-          className="w-full py-3.5 rounded-xl text-[15px] font-medium bg-[#6E3FA3] hover:bg-[#5A3286] active:scale-[0.98] transition disabled:opacity-60 mb-2.5"
-        >
-          {cargando === "nave" ? "Abriendo pago..." : "Pagar con Nave / Galicia"}
-        </button>
+        {config.nave && (
+          <button
+            onClick={() => pagar("nave")}
+            disabled={ocupado}
+            className="w-full py-3.5 rounded-xl text-[15px] font-medium bg-[#6E3FA3] hover:bg-[#5A3286] active:scale-[0.98] transition disabled:opacity-60 mb-2.5"
+          >
+            {cargando === "nave" ? "Abriendo pago..." : "Pagar con Nave / Galicia"}
+          </button>
+        )}
 
         {/* Botón Mercado Pago */}
-        <button
-          onClick={() => pagar("mp")}
-          disabled={ocupado}
-          className="w-full py-3.5 rounded-xl text-[15px] font-medium bg-[#18181B] border border-[#2A2A2E] hover:bg-[#211A2B] active:scale-[0.98] transition disabled:opacity-60 mb-2.5"
-        >
-          {cargando === "mp" ? "Abriendo pago..." : "Pagar con Mercado Pago"}
-        </button>
+        {config.mp && (
+          <button
+            onClick={() => pagar("mp")}
+            disabled={ocupado}
+            className="w-full py-3.5 rounded-xl text-[15px] font-medium bg-[#18181B] border border-[#2A2A2E] hover:bg-[#211A2B] active:scale-[0.98] transition disabled:opacity-60 mb-2.5"
+          >
+            {cargando === "mp" ? "Abriendo pago..." : "Pagar con Mercado Pago"}
+          </button>
+        )}
 
         {/* Botón WhatsApp */}
-        <button
-          onClick={pagarPorWhatsApp}
-          disabled={ocupado}
-          className="w-full py-3.5 rounded-xl text-[15px] font-medium bg-[#18181B] border border-[#25D366] text-[#25D366] hover:bg-[#0d1f14] active:scale-[0.98] transition disabled:opacity-60"
-        >
-          {cargando === "whatsapp" ? "Generando link..." : "📲 Pagar por WhatsApp"}
-        </button>
+        {config.whatsapp && (
+          <button
+            onClick={pagarPorWhatsApp}
+            disabled={ocupado}
+            className="w-full py-3.5 rounded-xl text-[15px] font-medium bg-[#18181B] border border-[#25D366] text-[#25D366] hover:bg-[#0d1f14] active:scale-[0.98] transition disabled:opacity-60"
+          >
+            {cargando === "whatsapp" ? "Generando link..." : "📲 Pagar por WhatsApp"}
+          </button>
+        )}
 
         <p className="text-[11px] text-[#5A5A60] text-center mt-4">
           Al continuar aceptás los términos de servicio · Surcante
