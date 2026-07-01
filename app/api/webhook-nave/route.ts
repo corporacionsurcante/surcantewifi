@@ -64,7 +64,7 @@ export async function POST(solicitud: NextRequest) {
     }
 
     // Buscamos el pago pendiente guardado cuando se creó la intención.
-    const pagoGuardado = buscarPago(external_payment_id);
+    const pagoGuardado = await buscarPago(external_payment_id);
     if (!pagoGuardado) {
       console.error(
         "[webhook-nave] No se encontró el pago pendiente:",
@@ -78,7 +78,7 @@ export async function POST(solicitud: NextRequest) {
       return NextResponse.json({ recibido: true });
     }
 
-    marcarPagoConfirmado(external_payment_id);
+    await marcarPagoConfirmado(external_payment_id);
 
     const resultadoOmada = await autorizarClienteEnOmada({
       clientMac: pagoGuardado.clientMac,
