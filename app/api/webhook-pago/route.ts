@@ -45,7 +45,7 @@ export async function POST(solicitud: NextRequest) {
       return NextResponse.json({ recibido: true });
     }
 
-    const pagoGuardado = buscarPago(referenciaExterna);
+    const pagoGuardado = await buscarPago(referenciaExterna);
     if (!pagoGuardado) {
       console.error(
         "[webhook-pago] No encontramos el pago pendiente para:",
@@ -55,13 +55,10 @@ export async function POST(solicitud: NextRequest) {
     }
 
     if (pagoGuardado.confirmadoEn) {
-      // Ya procesamos este pago antes (Mercado Pago puede mandar
-      // la misma notificación más de una vez). No hacemos nada de
-      // nuevo para no sumar minutos dos veces.
       return NextResponse.json({ recibido: true });
     }
 
-    marcarPagoConfirmado(referenciaExterna);
+    await marcarPagoConfirmado(referenciaExterna);
 
     // Llamamos a la API de Omada para autorizar el acceso real.
     //
