@@ -27,8 +27,8 @@ function ContenidoPortal() {
 
   const [macDePrueba, setMacDePrueba] = useState("");
   const [config, setConfig] = useState({ nave: true, mp: true, whatsapp: true });
-  
-  // Estado para controlar visualmente si el usuario está atrapado en el CNA
+
+  // Control de estado para saber si el cliente está retenido dentro del CNA
   const [estaEnCNA, setEstaEnCNA] = useState(false);
 
   const macCliente = parametros.get("clientMac") || macDePrueba;
@@ -37,12 +37,12 @@ function ContenidoPortal() {
   const nombreSsid = parametros.get("ssidName") ?? "";
   const nombreSitio = parametros.get("site") ?? "";
 
-  // Detección y escape automático del mini-navegador cautivo (CNA)
+  // Detección y desvío automático del Captive Network Assistant (CNA)
   useEffect(() => {
     const ua = navigator.userAgent || navigator.vendor || window.opera;
     let cnaDetectado = false;
 
-    // Validación para iOS (iPhone / iPad)
+    // Validación para el mini-navegador integrado de iOS (iPhone / iPad)
     if (/iPhone|iPad|iPod/i.test(ua)) {
       if (navigator.standalone || /CriOS/i.test(ua) || /FxiOS/i.test(ua)) {
         cnaDetectado = false;
@@ -51,7 +51,7 @@ function ContenidoPortal() {
       }
     }
 
-    // Validación para Android
+    // Validación para el mini-navegador integrado de Android
     if (/Android/i.test(ua)) {
       if (/wv/i.test(ua) || (/Version\/[0-9\.]+/i.test(ua) && /Chrome\/[0-9\.]+/i.test(ua) === false)) {
         cnaDetectado = true;
@@ -173,7 +173,7 @@ function ContenidoPortal() {
       const datos = await respuesta.json();
       const planActual = PLANES.find((p) => p.id === planSeleccionado) ?? PLANES[1];
       const mensaje = `🛜 Mi link de pago WAIFAI\n${planActual.nombre} - $${planActual.precio.toLocaleString("es-AR")}\n\n${datos.urlPago}`;
-      window.location.href = `https://wa.me{encodeURIComponent(mensaje)}`;
+      window.location.href = `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
     } catch (e) {
       setError("Hubo un problema. Probá de nuevo.");
     } finally {
@@ -240,7 +240,7 @@ function ContenidoPortal() {
     <main className="min-h-screen flex flex-col items-center px-5 py-9 bg-[#0A0A0C]">
       <div className="w-full max-w-sm">
 
-        {/* CARTEL DE RESPALDO MANUAL PARA ESCAPAR DEL CNA */}
+        {/* CARTEL DE RESPALDO MANUAL PARA ESCAPAR DEL CNA INTERNO */}
         {estaEnCNA && (
           <div className="w-full p-4 mb-6 bg-[#211A2B] border border-amber-500/40 text-amber-200 text-center rounded-2xl shadow-md">
             <p className="font-bold text-sm text-amber-400">⚠️ IMPORTANTE PARA MERCADO PAGO</p>
@@ -271,4 +271,3 @@ function ContenidoPortal() {
               CONECTADO A WIFI SURCANTE
             </span>
           </div>
-          <div className="w-16 h-16 rounded-full bg-[#6E3FA3] flex items-center justify-center mx-auto">
