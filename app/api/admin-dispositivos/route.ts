@@ -17,20 +17,24 @@ async function obtenerIdControlador(urlBase: string): Promise<string> {
 }
 
 async function obtenerToken(urlBase: string, idControlador: string) {
+  // Para consultar dispositivos y sitios necesitamos credenciales de admin,
+  // no de operador. Usamos OMADA_ADMIN_USER y OMADA_ADMIN_PASSWORD si están
+  // disponibles, sino caemos a las credenciales de operador.
+  const usuario = process.env.OMADA_ADMIN_USER || process.env.OMADA_OPERATOR_USER;
+  const contrasena = process.env.OMADA_ADMIN_PASSWORD || process.env.OMADA_OPERATOR_PASSWORD;
+
   const r = await fetch(
-    `${urlBase}/${idControlador}/api/v2/hotspot/login`,
+    `${urlBase}/${idControlador}/api/v2/login`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: process.env.OMADA_OPERATOR_USER,
-        password: process.env.OMADA_OPERATOR_PASSWORD,
-      }),
+      body: JSON.stringify({ username: usuario, password: contrasena }),
       // @ts-expect-error undici dispatcher
       dispatcher: agente,
     }
   );
   const d = await r.json();
+  console.log("[admin-dispositivos] Login response:", JSON.stringify(d).slice(0, 200));
   return {
     token: d.result?.token ?? "",
     cookie: r.headers.get("set-cookie") ?? "",
