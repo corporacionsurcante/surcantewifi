@@ -88,10 +88,10 @@ export async function GET(solicitud: NextRequest) {
     const siteName = sitios[0].name;
     console.log("[admin-dispositivos] Usando sitio:", siteId, siteName);
 
-    // Obtenemos APs y clientes en paralelo
+    // En Omada v6 los endpoints cambiaron - probamos las variantes
     const [apsResp, clientesResp] = await Promise.all([
       fetch(
-        `${urlBase}/${idControlador}/api/v2/sites/${siteId}/eaps?page=1&pageSize=100&currentPage=1&currentPageSize=100`,
+        `${urlBase}/${idControlador}/api/v2/sites/${siteId}/aps?page=1&pageSize=100&currentPage=1&currentPageSize=100`,
         {
           headers: { "Csrf-Token": token, Cookie: cookie },
           // @ts-expect-error undici dispatcher
@@ -99,7 +99,7 @@ export async function GET(solicitud: NextRequest) {
         }
       ),
       fetch(
-        `${urlBase}/${idControlador}/api/v2/sites/${siteId}/clients?page=1&pageSize=100&currentPage=1&currentPageSize=100`,
+        `${urlBase}/${idControlador}/api/v2/sites/${siteId}/clients?filters.active=true&page=1&pageSize=100&currentPage=1&currentPageSize=100`,
         {
           headers: { "Csrf-Token": token, Cookie: cookie },
           // @ts-expect-error undici dispatcher
