@@ -99,6 +99,8 @@ export async function GET(solicitud: NextRequest) {
     const devData = await devResp.json();
     const clientesData = await clientesResp.json();
 
+    console.log("[admin-dispositivos] Devices:", JSON.stringify(devData).slice(0, 500));
+
     // Filtramos solo APs (EAP225)
     const aps = (devData.result?.data ?? [])
       .filter((d: Record<string, unknown>) => d.type === 2 || String(d.model ?? "").includes("EAP"))
