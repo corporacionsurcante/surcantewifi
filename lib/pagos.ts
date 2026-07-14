@@ -13,7 +13,6 @@ export type PagoPendiente = {
   redirectUrl: string;
   creadoEn: number;
   confirmadoEn: number | null;
-  // Para el panel admin
   monto?: number;
   procesador?: "mp" | "nave";
 };
@@ -24,7 +23,7 @@ const SET_PAGOS = "pagos:todos";
 
 export async function guardarPagoPendiente(pago: PagoPendiente): Promise<void> {
   const key = `${PREFIJO_PAGO}${pago.preferenciaId}`;
-  await redis.set(key, JSON.stringify(pago), { ex: 60 * 60 * 24 * 30 }); // 30 días
+  await redis.set(key, JSON.stringify(pago), { ex: 60 * 60 * 24 * 30 });
   await redis.sadd(SET_PAGOS, pago.preferenciaId);
 }
 
@@ -41,10 +40,16 @@ export async function marcarPagoConfirmado(preferenciaId: string): Promise<void>
   pago.confirmadoEn = Date.now();
   const key = `${PREFIJO_PAGO}${preferenciaId}`;
   await redis.set(key, JSON.stringify(pago), { ex: 60 * 60 * 24 * 30 });
-  // Guardamos también por MAC para saber qué dispositivos pagaron
+
+  // Guardamos por MAC para reconexión automática
   if (pago.clientMac) {
     const macKey = `${PREFIJO_MAC}${pago.clientMac}`;
-    await redis.set(macKey, JSON.stringify(pago), { ex: 60 * 60 * 24 * 30 });
+    await redis.set(macKey, JSON.stringify({
+      confirmadoEn: pago.confirmadoEn,
+      duracionMinutos: pago.duracionMinutos,
+      tipo: "pago",
+      planId: pago.planId,
+    }), { ex: 60 * 60 * 24 * 30 });
   }
 }
 
