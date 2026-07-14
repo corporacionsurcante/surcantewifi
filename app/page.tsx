@@ -243,7 +243,7 @@ function ContenidoPortal() {
     <main className="min-h-screen flex flex-col items-center px-5 py-9 bg-[#0A0A0C]">
       <div className="w-full max-w-sm">
 
-        {/* 🌟 CARTEL DE RESPALDO MANUAL (Se muestra si se detecta CNA o si falla el desvío automático) 🌟 */}
+        {/* 🌟 CARTEL DE RESPALDO MANUAL PARA ESCAPAR DEL CNA 🌟 */}
         {estaEnCNA && (
           <div className="w-full p-4 mb-6 bg-[#211A2B] border border-amber-500/40 text-amber-200 text-center rounded-2xl shadow-md">
             <p className="font-bold text-sm text-amber-400">⚠️ IMPORTANTE PARA MERCADO PAGO</p>
