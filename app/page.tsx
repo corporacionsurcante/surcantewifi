@@ -28,7 +28,7 @@ function ContenidoPortal() {
   const [macDePrueba, setMacDePrueba] = useState("");
   const [config, setConfig] = useState({ nave: true, mp: true, whatsapp: true });
   
-  // Control visual del mini-navegador del sistema (CNA)
+  // Variable de control para detectar el mini-navegador del sistema (CNA)
   const [estaEnCNA, setEstaEnCNA] = useState(false);
 
   const macCliente = parametros.get("clientMac") || macDePrueba;
@@ -37,12 +37,12 @@ function ContenidoPortal() {
   const nombreSsid = parametros.get("ssidName") ?? "";
   const nombreSitio = parametros.get("site") ?? "";
 
-  // Detección y escape automático del Captive Network Assistant (CNA)
+  // Detección y redirección automática para escapar del entorno aislado CNA
   useEffect(() => {
     const ua = navigator.userAgent || navigator.vendor || window.opera;
     let cnaDetectado = false;
 
-    // Validación para dispositivos iOS (iPhone / iPad)
+    // Validación para ecosistema iOS
     if (/iPhone|iPad|iPod/i.test(ua)) {
       if (navigator.standalone || /CriOS/i.test(ua) || /FxiOS/i.test(ua)) {
         cnaDetectado = false;
@@ -51,7 +51,7 @@ function ContenidoPortal() {
       }
     }
 
-    // Validación para dispositivos Android
+    // Validación para ecosistema Android
     if (/Android/i.test(ua)) {
       if (/wv/i.test(ua) || (/Version\/[0-9\.]+/i.test(ua) && /Chrome\/[0-9\.]+/i.test(ua) === false)) {
         cnaDetectado = true;
