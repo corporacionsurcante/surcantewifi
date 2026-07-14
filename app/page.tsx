@@ -17,6 +17,8 @@ function ContenidoPortal() {
   const [planSeleccionado, setPlanSeleccionado] = useState(PLANES[1].id);
   const [cargando, setCargando] = useState<"mp" | "nave" | "whatsapp" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [verificando, setVerificando] = useState(true);
+  const [accesoAutomatico, setAccesoAutomatico] = useState(false);
 
   const [mostrarCodigo, setMostrarCodigo] = useState(false);
   const [codigo, setCodigo] = useState("");
@@ -26,6 +28,12 @@ function ContenidoPortal() {
   const [macDePrueba, setMacDePrueba] = useState("");
   const [config, setConfig] = useState({ nave: true, mp: true, whatsapp: true });
 
+  const macCliente = parametros.get("clientMac") || macDePrueba;
+  const macAp = parametros.get("apMac") ?? "";
+  const urlRedireccion = parametros.get("redirectUrl") ?? "";
+  const nombreSsid = parametros.get("ssidName") ?? "";
+  const nombreSitio = parametros.get("site") ?? "";
+
   useEffect(() => {
     const clave = "surcante-mac-prueba";
     let mac = window.localStorage.getItem(clave);
@@ -34,26 +42,54 @@ function ContenidoPortal() {
       window.localStorage.setItem(clave, mac);
     }
     setMacDePrueba(mac);
-    // Carga la configuración de medios de pago activos
+
+    // Carga configuración de medios de pago
     fetch("/api/config-publica")
       .then((r) => r.json())
       .then((datos) => setConfig(datos))
       .catch(() => {});
   }, []);
 
-  const macCliente = parametros.get("clientMac") || macDePrueba;
-  const macAp = parametros.get("apMac") ?? "";
-  const urlRedireccion = parametros.get("redirectUrl") ?? "";
-  const nombreSsid = parametros.get("ssidName") ?? "";
-  const nombreSitio = parametros.get("site") ?? "";
+  useEffect(() => {
+    const mac = parametros.get("clientMac") || macDePrueba;
+    if (!mac || mac.startsWith("PRUEBA-")) {
+      setVerificando(false);
+      return;
+    }
+
+    // Verifica si esta MAC ya tiene acceso activo
+    fetch("/api/verificar-acceso", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        clientMac: mac,
+        apMac: parametros.get("apMac") ?? "",
+        ssidName: parametros.get("ssidName") ?? "",
+        site: parametros.get("site") ?? "",
+      }),
+    })
+      .then((r) => r.json())
+      .then((datos) => {
+        if (datos.tieneAcceso) {
+          setAccesoAutomatico(true);
+          // Redirigir a la URL original si existe
+          const redirect = parametros.get("redirectUrl");
+          if (redirect) {
+            setTimeout(() => {
+              window.location.href = redirect;
+            }, 2000);
+          }
+        }
+      })
+      .catch(() => {})
+      .finally(() => setVerificando(false));
+  }, [macDePrueba, parametros]);
 
   async function pagar(medio: "mp" | "nave") {
     setError(null);
     setCargando(medio);
     try {
-      const endpoint =
-        medio === "nave" ? "/api/crear-pago-nave" : "/api/crear-pago";
-
+      const endpoint = medio === "nave" ? "/api/crear-pago-nave" : "/api/crear-pago";
       const respuesta = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -66,9 +102,7 @@ function ContenidoPortal() {
           site: nombreSitio,
         }),
       });
-
       if (!respuesta.ok) throw new Error("Error al iniciar el pago");
-
       const datos = await respuesta.json();
       window.location.href = datos.urlPago;
     } catch (e) {
@@ -93,14 +127,11 @@ function ContenidoPortal() {
           site: nombreSitio,
         }),
       });
-
       if (!respuesta.ok) throw new Error("Error al iniciar el pago");
-
       const datos = await respuesta.json();
       const planActual = PLANES.find((p) => p.id === planSeleccionado) ?? PLANES[1];
       const mensaje = `🛜 Mi link de pago WAIFAI\n${planActual.nombre} - $${planActual.precio.toLocaleString("es-AR")}\n\n${datos.urlPago}`;
-      const urlWhatsApp = `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
-      window.location.href = urlWhatsApp;
+      window.location.href = `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
     } catch (e) {
       setError("Hubo un problema. Probá de nuevo.");
     } finally {
@@ -138,8 +169,33 @@ function ContenidoPortal() {
 
   const ocupado = cargando !== null;
 
+  // Pantalla de verificando acceso
+  if (verificando) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center bg-[#0A0A0C]">
+        <div className="w-8 h-8 rounded-full bg-[#6E3FA3] animate-pulse mx-auto mb-4" />
+        <p className="text-[#A0A0A8] text-sm">Verificando acceso...</p>
+      </main>
+    );
+  }
+
+  // Pantalla de acceso automático reconocido
+  if (accesoAutomatico) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center px-5 bg-[#0A0A0C]">
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-full bg-green-700 flex items-center justify-center mx-auto mb-4">
+            <span className="text-white text-3xl">✓</span>
+          </div>
+          <p className="text-white text-xl font-medium mb-2">¡Bienvenido de vuelta!</p>
+          <p className="text-[#A0A0A8] text-sm">Tu acceso sigue activo. Conectando...</p>
+        </div>
+      </main>
+    );
+  }
+
   return (
-    <main className="min-h-screen flex flex-col items-center px-5 py-9">
+    <main className="min-h-screen flex flex-col items-center px-5 py-9 bg-[#0A0A0C]">
       <div className="w-full max-w-sm">
 
         <div className="text-center mb-7">
@@ -186,11 +242,8 @@ function ContenidoPortal() {
           <p className="text-sm text-red-400 mt-4 text-center">{error}</p>
         )}
 
-        <p className="text-xs text-[#A0A0A8] text-center mt-5 mb-3">
-          Elegí cómo pagar
-        </p>
+        <p className="text-xs text-[#A0A0A8] text-center mt-5 mb-3">Elegí cómo pagar</p>
 
-        {/* Botón Nave / Galicia */}
         {config.nave && (
           <button
             onClick={() => pagar("nave")}
@@ -201,7 +254,6 @@ function ContenidoPortal() {
           </button>
         )}
 
-        {/* Botón Mercado Pago */}
         {config.mp && (
           <button
             onClick={() => pagar("mp")}
@@ -212,7 +264,6 @@ function ContenidoPortal() {
           </button>
         )}
 
-        {/* Botón WhatsApp */}
         {config.whatsapp && (
           <button
             onClick={pagarPorWhatsApp}
