@@ -17,14 +17,11 @@ async function obtenerIdControlador(urlBase: string): Promise<string> {
 }
 
 async function obtenerToken(urlBase: string, idControlador: string) {
-  // Para consultar dispositivos y sitios necesitamos credenciales de admin,
-  // no de operador. Usamos OMADA_ADMIN_USER y OMADA_ADMIN_PASSWORD si están
-  // disponibles, sino caemos a las credenciales de operador.
   const usuario = process.env.OMADA_ADMIN_USER || process.env.OMADA_OPERATOR_USER;
   const contrasena = process.env.OMADA_ADMIN_PASSWORD || process.env.OMADA_OPERATOR_PASSWORD;
 
   const r = await fetch(
-    `${urlBase}/${idControlador}/api/v2/login`,
+    `${urlBase}/${idControlador}/api/v3/users/login`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -34,7 +31,7 @@ async function obtenerToken(urlBase: string, idControlador: string) {
     }
   );
   const d = await r.json();
-  console.log("[admin-dispositivos] Login response:", JSON.stringify(d).slice(0, 200));
+  console.log("[admin-dispositivos] Login v3:", JSON.stringify(d).slice(0, 200));
   return {
     token: d.result?.token ?? "",
     cookie: r.headers.get("set-cookie") ?? "",
@@ -55,53 +52,42 @@ export async function GET(solicitud: NextRequest) {
     const idControlador = await obtenerIdControlador(urlBase);
     const { token, cookie } = await obtenerToken(urlBase, idControlador);
 
-    const headers = {
-      "Csrf-Token": token,
-      Cookie: cookie,
-    };
+    const headers = { "Csrf-Token": token, Cookie: cookie };
 
-    // En Omada v6 el endpoint de sitios usa el omadacId del resultado del login
+    // Obtenemos sitios con API v3
     const sitiosResp = await fetch(
-      `${urlBase}/${idControlador}/api/v2/sites?pageSize=100&page=1&currentPage=1&currentPageSize=100`,
+      `${urlBase}/${idControlador}/api/v3/sites?currentPage=1&currentPageSize=100`,
       {
-        headers: {
-          "Csrf-Token": token,
-          Cookie: cookie,
-          "Content-Type": "application/json",
-        },
+        headers,
         // @ts-expect-error undici dispatcher
         dispatcher: agente,
       }
     );
     const sitiosData = await sitiosResp.json();
-    console.log("[admin-dispositivos] Sitios raw:", JSON.stringify(sitiosData).slice(0, 500));
-    
-    let sitios = sitiosData.result?.data ?? [];
+    console.log("[admin-dispositivos] Sitios v3:", JSON.stringify(sitiosData).slice(0, 400));
 
-    console.log("[admin-dispositivos] Sitios encontrados:", JSON.stringify(sitios.map((s: Record<string, unknown>) => ({ id: s.id, name: s.name }))));
+    const sitios = sitiosData.result?.data ?? sitiosData.result ?? [];
 
     if (sitios.length === 0) {
       return NextResponse.json({ aps: [], clientes: [], total: 0 });
     }
 
-    const siteId = sitios[0].id;
-    const siteName = sitios[0].name;
-    console.log("[admin-dispositivos] Usando sitio:", siteId, siteName);
+    const siteId = sitios[0].id ?? sitios[0].siteId;
+    console.log("[admin-dispositivos] SiteId:", siteId);
 
-    // En Omada v6 los endpoints cambiaron - probamos las variantes
     const [apsResp, clientesResp] = await Promise.all([
       fetch(
-        `${urlBase}/${idControlador}/api/v2/sites/${siteId}/aps?page=1&pageSize=100&currentPage=1&currentPageSize=100`,
+        `${urlBase}/${idControlador}/api/v3/sites/${siteId}/eaps?currentPage=1&currentPageSize=100`,
         {
-          headers: { "Csrf-Token": token, Cookie: cookie },
+          headers,
           // @ts-expect-error undici dispatcher
           dispatcher: agente,
         }
       ),
       fetch(
-        `${urlBase}/${idControlador}/api/v2/sites/${siteId}/clients?filters.active=true&page=1&pageSize=100&currentPage=1&currentPageSize=100`,
+        `${urlBase}/${idControlador}/api/v3/sites/${siteId}/clients?currentPage=1&currentPageSize=100`,
         {
-          headers: { "Csrf-Token": token, Cookie: cookie },
+          headers,
           // @ts-expect-error undici dispatcher
           dispatcher: agente,
         }
@@ -111,8 +97,8 @@ export async function GET(solicitud: NextRequest) {
     const apsData = await apsResp.json();
     const clientesData = await clientesResp.json();
 
-    console.log("[admin-dispositivos] APs data:", JSON.stringify(apsData).slice(0, 300));
-    console.log("[admin-dispositivos] Clientes data:", JSON.stringify(clientesData).slice(0, 300));
+    console.log("[admin-dispositivos] APs v3:", JSON.stringify(apsData).slice(0, 400));
+    console.log("[admin-dispositivos] Clientes v3:", JSON.stringify(clientesData).slice(0, 400));
 
     const aps = (apsData.result?.data ?? []).map((ap: Record<string, unknown>) => ({
       mac: ap.mac,
@@ -121,7 +107,6 @@ export async function GET(solicitud: NextRequest) {
       modelo: ap.model,
       estado: ap.status === 0 ? "conectado" : "desconectado",
       clientesConectados: ap.clientNum ?? 0,
-      uptime: ap.uptime,
     }));
 
     const clientes = (clientesData.result?.data ?? []).map((c: Record<string, unknown>) => ({
@@ -133,22 +118,16 @@ export async function GET(solicitud: NextRequest) {
       señal: c.signalLevel ?? 0,
     }));
 
-    // Geolocalización por IP pública del Starlink
+    // Geolocalización por IP del Starlink (IP pública del servidor como aproximación)
     const apsConUbicacion = await Promise.all(
-      aps.map(async (ap: { mac: string; nombre: string; ip: string; modelo: string; estado: string; clientesConectados: number; uptime: number }) => {
-        if (!ap.ip || ap.ip.startsWith("192.") || ap.ip.startsWith("10.") || ap.ip.startsWith("172.")) {
-          // IP privada, intentamos con la IP pública del servidor
-          try {
-            const geoResp = await fetch(`http://ip-api.com/json/?fields=lat,lon,city,regionName,status`);
-            const geo = await geoResp.json();
-            if (geo.status === "success") {
-              return { ...ap, ubicacion: { lat: geo.lat, lon: geo.lon, ciudad: geo.city, region: geo.regionName } };
-            }
-          } catch { /* sin ubicación */ }
-          return { ...ap, ubicacion: null };
-        }
+      aps.map(async (ap: { mac: string; nombre: string; ip: string; modelo: string; estado: string; clientesConectados: number }) => {
+        const ipParaGeo = (!ap.ip || ap.ip.startsWith("192.") || ap.ip.startsWith("10.") || ap.ip.startsWith("172."))
+          ? "" : ap.ip;
         try {
-          const geoResp = await fetch(`http://ip-api.com/json/${ap.ip}?fields=lat,lon,city,regionName,status`);
+          const url = ipParaGeo
+            ? `http://ip-api.com/json/${ipParaGeo}?fields=lat,lon,city,regionName,status`
+            : `http://ip-api.com/json/?fields=lat,lon,city,regionName,status`;
+          const geoResp = await fetch(url);
           const geo = await geoResp.json();
           if (geo.status === "success") {
             return { ...ap, ubicacion: { lat: geo.lat, lon: geo.lon, ciudad: geo.city, region: geo.regionName } };
@@ -158,11 +137,7 @@ export async function GET(solicitud: NextRequest) {
       })
     );
 
-    return NextResponse.json({
-      aps: apsConUbicacion,
-      clientes,
-      total: clientes.length,
-    });
+    return NextResponse.json({ aps: apsConUbicacion, clientes, total: clientes.length });
   } catch (error) {
     console.error("[admin-dispositivos] Error:", error);
     return NextResponse.json({ error: String(error) }, { status: 500 });
