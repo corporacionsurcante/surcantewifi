@@ -207,7 +207,7 @@ function ContenidoPortal() {
 
     let ventanaPopup: Window | null = null;
     try {
-      ventanaPopup = window.open("", "_blank", "noopener,noreferrer");
+      ventanaPopup = window.open("", "_blank");
     } catch (e) {
       console.log("[pagar] window.open falló", e);
       ventanaPopup = null;
@@ -247,7 +247,7 @@ function ContenidoPortal() {
 
     let ventanaPopup: Window | null = null;
     try {
-      ventanaPopup = window.open("", "_blank", "noopener,noreferrer");
+      ventanaPopup = window.open("", "_blank");
     } catch (e) {
       console.log("[pagarPorWhatsApp] window.open falló", e);
       ventanaPopup = null;
