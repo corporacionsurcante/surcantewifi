@@ -99,29 +99,19 @@ export async function GET(solicitud: NextRequest) {
     const devData = await devResp.json();
     const clientesData = await clientesResp.json();
 
-    console.log("[admin-dispositivos] Devices:", JSON.stringify(devData).slice(0, 500));
-
-    // Filtramos solo APs (EAP225)
-    const aps = (devData.result?.data ?? [])
-      .filter((d: Record<string, unknown>) => d.type === 2 || String(d.model ?? "").includes("EAP"))
+    // El campo type es string "ap" en esta versión de Omada
+    const todosDevices = devData.result?.data ?? devData.result ?? [];
+    const dispositivosFinales = todosDevices
+      .filter((d: Record<string, unknown>) => d.type === "ap" || String(d.model ?? "").includes("EAP"))
       .map((ap: Record<string, unknown>) => ({
         mac: ap.mac,
         nombre: ap.name,
         ip: ap.ip,
+        ipPublica: ap.publicIp,
         modelo: ap.model,
-        estado: ap.status === 0 ? "conectado" : "desconectado",
+        estado: ap.statusCategory === 1 ? "conectado" : "desconectado",
         clientesConectados: ap.clientNum ?? 0,
       }));
-
-    // Si no hay APs filtrados tomamos todos los devices
-    const dispositivosFinales = aps.length > 0 ? aps : (devData.result?.data ?? []).map((d: Record<string, unknown>) => ({
-      mac: d.mac,
-      nombre: d.name,
-      ip: d.ip,
-      modelo: d.model,
-      estado: d.status === 0 ? "conectado" : "desconectado",
-      clientesConectados: d.clientNum ?? 0,
-    }));
 
     const clientes = (clientesData.result?.data ?? []).map((c: Record<string, unknown>) => ({
       mac: c.mac,
@@ -135,12 +125,13 @@ export async function GET(solicitud: NextRequest) {
 
     // Geolocalización por IP del AP (o IP pública del servidor como fallback)
     const apsConUbicacion = await Promise.all(
-      dispositivosFinales.map(async (ap: { mac: string; nombre: string; ip: string; modelo: string; estado: string; clientesConectados: number }) => {
-        const esPrivada = !ap.ip || ap.ip.startsWith("192.") || ap.ip.startsWith("10.") || ap.ip.startsWith("172.");
+      dispositivosFinales.map(async (ap: { mac: string; nombre: string; ip: string; ipPublica?: string; modelo: string; estado: string; clientesConectados: number }) => {
+        const ipGeo = ap.ipPublica || ap.ip;
+        const esPrivada = !ipGeo || ipGeo.startsWith("192.") || ipGeo.startsWith("10.") || ipGeo.startsWith("172.");
         try {
           const url = esPrivada
             ? `http://ip-api.com/json/?fields=lat,lon,city,regionName,status`
-            : `http://ip-api.com/json/${ap.ip}?fields=lat,lon,city,regionName,status`;
+            : `http://ip-api.com/json/${ipGeo}?fields=lat,lon,city,regionName,status`;
           const geoResp = await fetch(url);
           const geo = await geoResp.json();
           if (geo.status === "success") {
