@@ -84,23 +84,24 @@ export async function GET(solicitud: NextRequest) {
       return NextResponse.json({ aps: [], clientes: [], total: 0 });
     }
 
-    // Usamos el primer sitio disponible
     const siteId = sitios[0].id;
+    const siteName = sitios[0].name;
+    console.log("[admin-dispositivos] Usando sitio:", siteId, siteName);
 
     // Obtenemos APs y clientes en paralelo
     const [apsResp, clientesResp] = await Promise.all([
       fetch(
-        `${urlBase}/${idControlador}/api/v2/sites/${siteId}/eaps?page=1&pageSize=100`,
+        `${urlBase}/${idControlador}/api/v2/sites/${siteId}/eaps?page=1&pageSize=100&currentPage=1&currentPageSize=100`,
         {
-          headers,
+          headers: { "Csrf-Token": token, Cookie: cookie },
           // @ts-expect-error undici dispatcher
           dispatcher: agente,
         }
       ),
       fetch(
-        `${urlBase}/${idControlador}/api/v2/sites/${siteId}/clients?page=1&pageSize=100`,
+        `${urlBase}/${idControlador}/api/v2/sites/${siteId}/clients?page=1&pageSize=100&currentPage=1&currentPageSize=100`,
         {
-          headers,
+          headers: { "Csrf-Token": token, Cookie: cookie },
           // @ts-expect-error undici dispatcher
           dispatcher: agente,
         }
@@ -110,8 +111,8 @@ export async function GET(solicitud: NextRequest) {
     const apsData = await apsResp.json();
     const clientesData = await clientesResp.json();
 
-    console.log("[admin-dispositivos] APs:", JSON.stringify(apsData).slice(0, 200));
-    console.log("[admin-dispositivos] Clientes:", JSON.stringify(clientesData).slice(0, 200));
+    console.log("[admin-dispositivos] APs data:", JSON.stringify(apsData).slice(0, 300));
+    console.log("[admin-dispositivos] Clientes data:", JSON.stringify(clientesData).slice(0, 300));
 
     const aps = (apsData.result?.data ?? []).map((ap: Record<string, unknown>) => ({
       mac: ap.mac,
