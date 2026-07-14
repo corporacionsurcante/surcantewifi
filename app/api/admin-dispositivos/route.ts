@@ -21,7 +21,7 @@ async function obtenerToken(urlBase: string, idControlador: string) {
   const contrasena = process.env.OMADA_ADMIN_PASSWORD || process.env.OMADA_OPERATOR_PASSWORD;
 
   const r = await fetch(
-    `${urlBase}/${idControlador}/api/v3/users/login`,
+    `${urlBase}/${idControlador}/api/v2/login`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -31,10 +31,15 @@ async function obtenerToken(urlBase: string, idControlador: string) {
     }
   );
   const d = await r.json();
-  console.log("[admin-dispositivos] Login v3:", JSON.stringify(d).slice(0, 200));
+
+  // Extraemos solo el valor de TPOMADA_SESSIONID de la cookie
+  const setCookie = r.headers.get("set-cookie") ?? "";
+  const sessionMatch = setCookie.match(/TPOMADA_SESSIONID=([^;]+)/);
+  const sessionId = sessionMatch ? `TPOMADA_SESSIONID=${sessionMatch[1]}` : "";
+
   return {
     token: d.result?.token ?? "",
-    cookie: r.headers.get("set-cookie") ?? "",
+    cookie: sessionId,
   };
 }
 
@@ -51,82 +56,77 @@ export async function GET(solicitud: NextRequest) {
   try {
     const idControlador = await obtenerIdControlador(urlBase);
     const { token, cookie } = await obtenerToken(urlBase, idControlador);
-
     const headers = { "Csrf-Token": token, Cookie: cookie };
 
-    // Obtenemos sitios con API v3
+    // Obtenemos sitios
     const sitiosResp = await fetch(
-      `${urlBase}/${idControlador}/api/v3/sites?currentPage=1&currentPageSize=100`,
-      {
-        headers,
-        // @ts-expect-error undici dispatcher
-        dispatcher: agente,
-      }
+      `${urlBase}/${idControlador}/api/v2/sites?currentPage=1&currentPageSize=100`,
+      { headers, dispatcher: agente } as RequestInit
     );
     const sitiosData = await sitiosResp.json();
-    console.log("[admin-dispositivos] Sitios v3:", JSON.stringify(sitiosData).slice(0, 400));
-
-    const sitios = sitiosData.result?.data ?? sitiosData.result ?? [];
+    const sitios = sitiosData.result?.data ?? [];
 
     if (sitios.length === 0) {
       return NextResponse.json({ aps: [], clientes: [], total: 0 });
     }
 
-    const siteId = sitios[0].id ?? sitios[0].siteId;
-    console.log("[admin-dispositivos] SiteId:", siteId);
+    const siteId = sitios[0].id;
 
-    const [apsResp, clientesResp] = await Promise.all([
+    // Obtenemos dispositivos y clientes en paralelo
+    const [devResp, clientesResp] = await Promise.all([
       fetch(
-        `${urlBase}/${idControlador}/api/v3/sites/${siteId}/eaps?currentPage=1&currentPageSize=100`,
-        {
-          headers,
-          // @ts-expect-error undici dispatcher
-          dispatcher: agente,
-        }
+        `${urlBase}/${idControlador}/api/v2/sites/${siteId}/devices?currentPage=1&currentPageSize=100`,
+        { headers, dispatcher: agente } as RequestInit
       ),
       fetch(
-        `${urlBase}/${idControlador}/api/v3/sites/${siteId}/clients?currentPage=1&currentPageSize=100`,
-        {
-          headers,
-          // @ts-expect-error undici dispatcher
-          dispatcher: agente,
-        }
+        `${urlBase}/${idControlador}/api/v2/sites/${siteId}/clients?currentPage=1&currentPageSize=100&filters.active=true`,
+        { headers, dispatcher: agente } as RequestInit
       ),
     ]);
 
-    const apsData = await apsResp.json();
+    const devData = await devResp.json();
     const clientesData = await clientesResp.json();
 
-    console.log("[admin-dispositivos] APs v3:", JSON.stringify(apsData).slice(0, 400));
-    console.log("[admin-dispositivos] Clientes v3:", JSON.stringify(clientesData).slice(0, 400));
+    // Filtramos solo APs (EAP225)
+    const aps = (devData.result?.data ?? [])
+      .filter((d: Record<string, unknown>) => d.type === 2 || String(d.model ?? "").includes("EAP"))
+      .map((ap: Record<string, unknown>) => ({
+        mac: ap.mac,
+        nombre: ap.name,
+        ip: ap.ip,
+        modelo: ap.model,
+        estado: ap.status === 0 ? "conectado" : "desconectado",
+        clientesConectados: ap.clientNum ?? 0,
+      }));
 
-    const aps = (apsData.result?.data ?? []).map((ap: Record<string, unknown>) => ({
-      mac: ap.mac,
-      nombre: ap.name,
-      ip: ap.ip,
-      modelo: ap.model,
-      estado: ap.status === 0 ? "conectado" : "desconectado",
-      clientesConectados: ap.clientNum ?? 0,
+    // Si no hay APs filtrados tomamos todos los devices
+    const dispositivosFinales = aps.length > 0 ? aps : (devData.result?.data ?? []).map((d: Record<string, unknown>) => ({
+      mac: d.mac,
+      nombre: d.name,
+      ip: d.ip,
+      modelo: d.model,
+      estado: d.status === 0 ? "conectado" : "desconectado",
+      clientesConectados: d.clientNum ?? 0,
     }));
 
     const clientes = (clientesData.result?.data ?? []).map((c: Record<string, unknown>) => ({
       mac: c.mac,
-      nombre: c.name || c.hostname || "Dispositivo",
+      nombre: c.name || "Dispositivo",
       ip: c.ip,
       apMac: c.apMac,
+      apNombre: c.apName,
       ssid: c.ssid,
       señal: c.signalLevel ?? 0,
     }));
 
-    // Geolocalización por IP del Starlink (IP pública del servidor como aproximación)
+    // Geolocalización por IP del AP (o IP pública del servidor como fallback)
     const apsConUbicacion = await Promise.all(
-      aps.map(async (ap: { mac: string; nombre: string; ip: string; modelo: string; estado: string; clientesConectados: number }) => {
-        const ipParaGeo = (!ap.ip || ap.ip.startsWith("192.") || ap.ip.startsWith("10.") || ap.ip.startsWith("172."))
-          ? "" : ap.ip;
+      dispositivosFinales.map(async (ap: { mac: string; nombre: string; ip: string; modelo: string; estado: string; clientesConectados: number }) => {
+        const esPrivada = !ap.ip || ap.ip.startsWith("192.") || ap.ip.startsWith("10.") || ap.ip.startsWith("172.");
         try {
-          const url = ipParaGeo
-            ? `http://ip-api.com/json/${ipParaGeo}?fields=lat,lon,city,regionName,status`
-            : `http://ip-api.com/json/?fields=lat,lon,city,regionName,status`;
+          const url = esPrivada
+            ? `http://ip-api.com/json/?fields=lat,lon,city,regionName,status`
+            : `http://ip-api.com/json/${ap.ip}?fields=lat,lon,city,regionName,status`;
           const geoResp = await fetch(url);
           const geo = await geoResp.json();
           if (geo.status === "success") {
@@ -137,7 +137,11 @@ export async function GET(solicitud: NextRequest) {
       })
     );
 
-    return NextResponse.json({ aps: apsConUbicacion, clientes, total: clientes.length });
+    return NextResponse.json({
+      aps: apsConUbicacion,
+      clientes,
+      total: clientes.length,
+    });
   } catch (error) {
     console.error("[admin-dispositivos] Error:", error);
     return NextResponse.json({ error: String(error) }, { status: 500 });
