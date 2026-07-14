@@ -60,17 +60,38 @@ export async function GET(solicitud: NextRequest) {
       Cookie: cookie,
     };
 
-    // Primero obtenemos los sitios para conseguir el siteId correcto
+    // En Omada v6 el endpoint de sitios usa el omadacId del resultado del login
     const sitiosResp = await fetch(
-      `${urlBase}/${idControlador}/api/v2/sites?page=1&pageSize=100`,
+      `${urlBase}/${idControlador}/api/v2/sites?pageSize=100&page=1`,
       {
-        headers,
+        headers: {
+          "Csrf-Token": token,
+          Cookie: cookie,
+          "Content-Type": "application/json",
+        },
         // @ts-expect-error undici dispatcher
         dispatcher: agente,
       }
     );
     const sitiosData = await sitiosResp.json();
-    const sitios = sitiosData.result?.data ?? [];
+    console.log("[admin-dispositivos] Sitios raw:", JSON.stringify(sitiosData).slice(0, 500));
+    
+    // Intentamos también con el endpoint alternativo
+    let sitios = sitiosData.result?.data ?? [];
+    
+    if (sitios.length === 0) {
+      const sitiosResp2 = await fetch(
+        `${urlBase}/${idControlador}/api/v2/user/sites?pageSize=100&page=1`,
+        {
+          headers: { "Csrf-Token": token, Cookie: cookie },
+          // @ts-expect-error undici dispatcher
+          dispatcher: agente,
+        }
+      );
+      const sitiosData2 = await sitiosResp2.json();
+      console.log("[admin-dispositivos] Sitios alternativo:", JSON.stringify(sitiosData2).slice(0, 500));
+      sitios = sitiosData2.result?.data ?? sitiosData2.result ?? [];
+    }
 
     console.log("[admin-dispositivos] Sitios encontrados:", JSON.stringify(sitios.map((s: Record<string, unknown>) => ({ id: s.id, name: s.name }))));
 
