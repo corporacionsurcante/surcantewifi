@@ -28,7 +28,7 @@ function ContenidoPortal() {
   const [macDePrueba, setMacDePrueba] = useState("");
   const [config, setConfig] = useState({ nave: true, mp: true, whatsapp: true });
   
-  // Estado para controlar visualmente si el usuario está atrapado en el CNA
+  // Control visual del mini-navegador del sistema (CNA)
   const [estaEnCNA, setEstaEnCNA] = useState(false);
 
   const macCliente = parametros.get("clientMac") || macDePrueba;
@@ -37,23 +37,23 @@ function ContenidoPortal() {
   const nombreSsid = parametros.get("ssidName") ?? "";
   const nombreSitio = parametros.get("site") ?? "";
 
-  // DETECCIÓN Y DESVÍO AUTOMÁTICO DEL MINI-NAVEGADOR (CNA)
+  // Detección y escape automático del Captive Network Assistant (CNA)
   useEffect(() => {
     const ua = navigator.userAgent || navigator.vendor || window.opera;
     let cnaDetectado = false;
 
-    // 1. Validar iOS
+    // Validación para dispositivos iOS (iPhone / iPad)
     if (/iPhone|iPad|iPod/i.test(ua)) {
       if (navigator.standalone || /CriOS/i.test(ua) || /FxiOS/i.test(ua)) {
         cnaDetectado = false;
-      } else if (!/Safari/i.test(ua) || /AppleWebKit\/[0-9\.]+.*Mobile/i.test(ua) && !/Version\/[0-9\.]+/i.test(ua)) {
+      } else if (!/Safari/i.test(ua) || (/AppleWebKit\/[0-9\.]+.*Mobile/i.test(ua) && !/Version\/[0-9\.]+/i.test(ua))) {
         cnaDetectado = true;
       }
     }
 
-    // 2. Validar Android
+    // Validación para dispositivos Android
     if (/Android/i.test(ua)) {
-      if (/wv/i.test(ua) || /Version\/[0-9\.]+/i.test(ua) && /Chrome\/[0-9\.]+/i.test(ua) === false) {
+      if (/wv/i.test(ua) || (/Version\/[0-9\.]+/i.test(ua) && /Chrome\/[0-9\.]+/i.test(ua) === false)) {
         cnaDetectado = true;
       }
     }
@@ -62,13 +62,10 @@ function ContenidoPortal() {
       setEstaEnCNA(true);
       const currentUrl = window.location.href;
 
-      // Desvío automático para Android
       if (/Android/i.test(ua)) {
         const chromeIntent = "intent://" + currentUrl.replace(/^https?:\/\//, "") + "#Intent;scheme=http;package=com.android.chrome;end";
         window.location.href = chromeIntent;
-      } 
-      // Desvío automático para iOS (romper sandbox)
-      else if (/iPhone|iPad|iPod/i.test(ua)) {
+      } else if (/iPhone|iPad|iPod/i.test(ua)) {
         const safariForceUrl = currentUrl + "?forceSafari=true";
         const link = document.createElement('a');
         link.href = safariForceUrl;
@@ -88,7 +85,6 @@ function ContenidoPortal() {
     }
     setMacDePrueba(mac);
 
-    // Carga configuración de medios de pago
     fetch("/api/config-publica")
       .then((r) => r.json())
       .then((datos) => setConfig(datos))
@@ -102,7 +98,6 @@ function ContenidoPortal() {
       return;
     }
 
-    // Verifica si esta MAC ya tiene acceso activo
     fetch("/api/verificar-acceso", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -117,7 +112,6 @@ function ContenidoPortal() {
       .then((datos) => {
         if (datos.tieneAcceso) {
           setAccesoAutomatico(true);
-          // Redirigir a la URL original si existe
           const redirect = parametros.get("redirectUrl");
           if (redirect) {
             setTimeout(() => {
@@ -214,7 +208,6 @@ function ContenidoPortal() {
 
   const ocupado = cargando !== null;
 
-  // Pantalla de verificando acceso
   if (verificando) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center bg-[#0A0A0C]">
@@ -224,7 +217,6 @@ function ContenidoPortal() {
     );
   }
 
-  // Pantalla de acceso automático reconocido
   if (accesoAutomatico) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center px-5 bg-[#0A0A0C]">
@@ -243,7 +235,6 @@ function ContenidoPortal() {
     <main className="min-h-screen flex flex-col items-center px-5 py-9 bg-[#0A0A0C]">
       <div className="w-full max-w-sm">
 
-        {/* CARTEL DE RESPALDO MANUAL PARA ESCAPAR DEL CNA */}
         {estaEnCNA && (
           <div className="w-full p-4 mb-6 bg-[#211A2B] border border-amber-500/40 text-amber-200 text-center rounded-2xl shadow-md">
             <p className="font-bold text-sm text-amber-400">⚠️ IMPORTANTE PARA MERCADO PAGO</p>
@@ -274,3 +265,10 @@ function ContenidoPortal() {
               CONECTADO A WIFI SURCANTE
             </span>
           </div>
+          <div className="w-16 h-16 rounded-full bg-[#6E3FA3] flex items-center justify-center mx-auto">
+            <span className="text-white text-3xl font-medium">S</span>
+          </div>
+          <p className="text-white text-xl font-medium mt-4 mb-1">Surcante WiFi</p>
+          <p className="text-[#A0A0A8] text-[13px]">Tu viaje, conectado</p>
+        </div>
+
