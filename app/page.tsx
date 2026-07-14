@@ -27,12 +27,57 @@ function ContenidoPortal() {
 
   const [macDePrueba, setMacDePrueba] = useState("");
   const [config, setConfig] = useState({ nave: true, mp: true, whatsapp: true });
+  
+  // Estado para controlar visualmente si el usuario está atrapado en el CNA
+  const [estaEnCNA, setEstaEnCNA] = useState(false);
 
   const macCliente = parametros.get("clientMac") || macDePrueba;
   const macAp = parametros.get("apMac") ?? "";
   const urlRedireccion = parametros.get("redirectUrl") ?? "";
   const nombreSsid = parametros.get("ssidName") ?? "";
   const nombreSitio = parametros.get("site") ?? "";
+
+  // 🌟 EFECTO DE DETECCIÓN Y DESVÍO AUTOMÁTICO DEL MINI-NAVEGADOR (CNA) 🌟
+  useEffect(() => {
+    const ua = navigator.userAgent || navigator.vendor || window.opera;
+    let cnaDetectado = false;
+
+    // 1. Validar iOS
+    if (/iPhone|iPad|iPod/i.test(ua)) {
+      if (navigator.standalone || /CriOS/i.test(ua) || /FxiOS/i.test(ua)) {
+        cnaDetectado = false;
+      } else if (!/Safari/i.test(ua) || /AppleWebKit\/[0-9\.]+.*Mobile/i.test(ua) && !/Version\/[0-9\.]+/i.test(ua)) {
+        cnaDetectado = true;
+      }
+    }
+
+    // 2. Validar Android
+    if (/Android/i.test(ua)) {
+      if (/wv/i.test(ua) || /Version\/[0-9\.]+/i.test(ua) && /Chrome\/[0-9\.]+/i.test(ua) === false) {
+        cnaDetectado = true;
+      }
+    }
+
+    if (cnaDetectado) {
+      setEstaEnCNA(true);
+      const currentUrl = window.location.href;
+
+      // Desvío automático para Android
+      if (/Android/i.test(ua)) {
+        const chromeIntent = "intent://" + currentUrl.replace(/^https?:\/\//, "") + "#Intent;scheme=http;package=com.android.chrome;end";
+        window.location.href = chromeIntent;
+      } 
+      // Desvío automático para iOS (romper sandbox)
+      else if (/iPhone|iPad|iPod/i.test(ua)) {
+        const safariForceUrl = currentUrl + "?forceSafari=true";
+        const link = document.createElement('a');
+        link.href = safariForceUrl;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const clave = "surcante-mac-prueba";
@@ -198,6 +243,30 @@ function ContenidoPortal() {
     <main className="min-h-screen flex flex-col items-center px-5 py-9 bg-[#0A0A0C]">
       <div className="w-full max-w-sm">
 
+        {/* 🌟 CARTEL DE RESPALDO MANUAL (Se muestra si se detecta CNA o si falla el desvío automático) 🌟 */}
+        {estaEnCNA && (
+          <div className="w-full p-4 mb-6 bg-[#211A2B] border border-amber-500/40 text-amber-200 text-center rounded-2xl shadow-md">
+            <p className="font-bold text-sm text-amber-400">⚠️ IMPORTANTE PARA MERCADO PAGO</p>
+            <p className="text-[12px] text-gray-300 mt-1 leading-relaxed">
+              Para poder pagar con tu aplicación sin bloqueos del sistema, necesitas abrir este portal en tu navegador principal.
+            </p>
+            <button
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  const currentUrl = window.location.href;
+                  window.location.href = "intent://" + currentUrl.replace(/^https?:\/\//, "") + "#Intent;scheme=http;package=com.android.chrome;end";
+                }
+              }}
+              className="inline-block mt-3 w-full py-2 bg-amber-500 hover:bg-amber-600 text-[#0A0A0C] font-semibold text-xs rounded-xl transition shadow-sm"
+            >
+              Abrir en Chrome (Android)
+            </button>
+            <p className="text-[11px] text-gray-400 mt-2">
+              En iPhone (iOS): Toca los tres puntos de la esquina y selecciona <b>"Abrir en Safari"</b>.
+            </p>
+          </div>
+        )}
+
         <div className="text-center mb-7">
           <div className="flex items-center justify-center gap-1.5 mb-5">
             <span className="w-1.5 h-1.5 rounded-full bg-[#8B5FBF] animate-pulse" />
@@ -205,112 +274,3 @@ function ContenidoPortal() {
               CONECTADO A WIFI SURCANTE
             </span>
           </div>
-          <div className="w-16 h-16 rounded-full bg-[#6E3FA3] flex items-center justify-center mx-auto">
-            <span className="text-white text-3xl font-medium">S</span>
-          </div>
-          <p className="text-white text-xl font-medium mt-4 mb-1">Surcante WiFi</p>
-          <p className="text-[#A0A0A8] text-[13px]">Tu viaje, conectado</p>
-        </div>
-
-        <p className="text-xs font-medium text-[#8B5FBF] uppercase tracking-wide mb-3">
-          Elegí tu plan
-        </p>
-
-        <div className="flex flex-col gap-2.5">
-          {PLANES.map((plan) => (
-            <button
-              key={plan.id}
-              onClick={() => setPlanSeleccionado(plan.id)}
-              className={`flex items-center justify-between rounded-2xl px-4 py-3.5 text-left transition border ${
-                planSeleccionado === plan.id
-                  ? "bg-[#211A2B] border-[#8B5FBF]"
-                  : "bg-[#18181B] border-[#2A2A2E]"
-              }`}
-            >
-              <div>
-                <p className="text-[14px] font-medium text-white">{plan.nombre}</p>
-                <p className="text-[13px] text-[#A0A0A8] mt-0.5">{plan.descripcion}</p>
-              </div>
-              <p className="text-[18px] font-medium text-white whitespace-nowrap ml-3">
-                ${plan.precio.toLocaleString("es-AR")}
-              </p>
-            </button>
-          ))}
-        </div>
-
-        {error && (
-          <p className="text-sm text-red-400 mt-4 text-center">{error}</p>
-        )}
-
-        <p className="text-xs text-[#A0A0A8] text-center mt-5 mb-3">Elegí cómo pagar</p>
-
-        {config.nave && (
-          <button
-            onClick={() => pagar("nave")}
-            disabled={ocupado}
-            className="w-full py-3.5 rounded-xl text-[15px] font-medium bg-[#6E3FA3] hover:bg-[#5A3286] active:scale-[0.98] transition disabled:opacity-60 mb-2.5"
-          >
-            {cargando === "nave" ? "Abriendo pago..." : "Pagar con Nave / Galicia"}
-          </button>
-        )}
-
-        {config.mp && (
-          <button
-            onClick={() => pagar("mp")}
-            disabled={ocupado}
-            className="w-full py-3.5 rounded-xl text-[15px] font-medium bg-[#18181B] border border-[#2A2A2E] hover:bg-[#211A2B] active:scale-[0.98] transition disabled:opacity-60 mb-2.5"
-          >
-            {cargando === "mp" ? "Abriendo pago..." : "Pagar con Mercado Pago"}
-          </button>
-        )}
-
-        {config.whatsapp && (
-          <button
-            onClick={pagarPorWhatsApp}
-            disabled={ocupado}
-            className="w-full py-3.5 rounded-xl text-[15px] font-medium bg-[#18181B] border border-[#25D366] text-[#25D366] hover:bg-[#0d1f14] active:scale-[0.98] transition disabled:opacity-60"
-          >
-            {cargando === "whatsapp" ? "Generando link..." : "📲 Pagar por WhatsApp"}
-          </button>
-        )}
-
-        <p className="text-[11px] text-[#5A5A60] text-center mt-4">
-          Al continuar aceptás los términos de servicio · Surcante
-        </p>
-
-        {!mostrarCodigo ? (
-          <button
-            onClick={() => setMostrarCodigo(true)}
-            className="block w-full text-center text-[12px] text-[#5A5A60] mt-6 underline"
-          >
-            ¿Tenés un código de acceso?
-          </button>
-        ) : (
-          <div className="mt-6 pt-5 border-t border-[#2A2A2E]">
-            <p className="text-[12px] text-[#A0A0A8] mb-2 text-center">
-              Ingresá tu código de acceso
-            </p>
-            <input
-              type="text"
-              value={codigo}
-              onChange={(e) => setCodigo(e.target.value.toUpperCase())}
-              placeholder="XXXX-XXXX"
-              className="w-full px-4 py-3 rounded-xl bg-[#18181B] border border-[#2A2A2E] text-white text-center font-mono tracking-wide mb-2"
-            />
-            {errorCodigo && (
-              <p className="text-sm text-red-400 mb-2 text-center">{errorCodigo}</p>
-            )}
-            <button
-              onClick={canjearCodigo}
-              disabled={canjeando || !codigo}
-              className="w-full py-3 rounded-xl text-[14px] font-medium bg-[#18181B] border border-[#2A2A2E] hover:bg-[#211A2B] transition disabled:opacity-60"
-            >
-              {canjeando ? "Validando..." : "Usar código"}
-            </button>
-          </div>
-        )}
-
-      </div>
-    </main>
-  );
-}
