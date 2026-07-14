@@ -37,7 +37,7 @@ function ContenidoPortal() {
   const nombreSsid = parametros.get("ssidName") ?? "";
   const nombreSitio = parametros.get("site") ?? "";
 
-  // 🌟 EFECTO DE DETECCIÓN Y DESVÍO AUTOMÁTICO DEL MINI-NAVEGADOR (CNA) 🌟
+  // DETECCIÓN Y DESVÍO AUTOMÁTICO DEL MINI-NAVEGADOR (CNA)
   useEffect(() => {
     const ua = navigator.userAgent || navigator.vendor || window.opera;
     let cnaDetectado = false;
@@ -176,7 +176,7 @@ function ContenidoPortal() {
       const datos = await respuesta.json();
       const planActual = PLANES.find((p) => p.id === planSeleccionado) ?? PLANES[1];
       const mensaje = `🛜 Mi link de pago WAIFAI\n${planActual.nombre} - $${planActual.precio.toLocaleString("es-AR")}\n\n${datos.urlPago}`;
-      window.location.href = `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
+      window.location.href = `https://wa.me{encodeURIComponent(mensaje)}`;
     } catch (e) {
       setError("Hubo un problema. Probá de nuevo.");
     } finally {
@@ -243,7 +243,7 @@ function ContenidoPortal() {
     <main className="min-h-screen flex flex-col items-center px-5 py-9 bg-[#0A0A0C]">
       <div className="w-full max-w-sm">
 
-        {/* 🌟 CARTEL DE RESPALDO MANUAL PARA ESCAPAR DEL CNA 🌟 */}
+        {/* CARTEL DE RESPALDO MANUAL PARA ESCAPAR DEL CNA */}
         {estaEnCNA && (
           <div className="w-full p-4 mb-6 bg-[#211A2B] border border-amber-500/40 text-amber-200 text-center rounded-2xl shadow-md">
             <p className="font-bold text-sm text-amber-400">⚠️ IMPORTANTE PARA MERCADO PAGO</p>
