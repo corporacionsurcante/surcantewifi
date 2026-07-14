@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Agent } from "undici";
 
-// @ts-expect-error undici dispatcher
 const agente = new Agent({ connect: { rejectUnauthorized: false } });
 
 function verificarAdmin(solicitud: NextRequest): boolean {
