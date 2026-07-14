@@ -61,7 +61,11 @@ export async function GET(solicitud: NextRequest) {
     // Obtenemos sitios
     const sitiosResp = await fetch(
       `${urlBase}/${idControlador}/api/v2/sites?currentPage=1&currentPageSize=100`,
-      { headers, dispatcher: agente } as RequestInit
+      {
+        headers,
+        // @ts-expect-error undici dispatcher
+        dispatcher: agente,
+      }
     );
     const sitiosData = await sitiosResp.json();
     const sitios = sitiosData.result?.data ?? [];
@@ -76,11 +80,19 @@ export async function GET(solicitud: NextRequest) {
     const [devResp, clientesResp] = await Promise.all([
       fetch(
         `${urlBase}/${idControlador}/api/v2/sites/${siteId}/devices?currentPage=1&currentPageSize=100`,
-        { headers, dispatcher: agente } as RequestInit
+        {
+          headers,
+          // @ts-expect-error undici dispatcher
+          dispatcher: agente,
+        }
       ),
       fetch(
         `${urlBase}/${idControlador}/api/v2/sites/${siteId}/clients?currentPage=1&currentPageSize=100&filters.active=true`,
-        { headers, dispatcher: agente } as RequestInit
+        {
+          headers,
+          // @ts-expect-error undici dispatcher
+          dispatcher: agente,
+        }
       ),
     ]);
 
