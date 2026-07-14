@@ -28,7 +28,7 @@ function ContenidoPortal() {
   const [macDePrueba, setMacDePrueba] = useState("");
   const [config, setConfig] = useState({ nave: true, mp: true, whatsapp: true });
   
-  // Variable de control para detectar el mini-navegador del sistema (CNA)
+  // Control de interfaz si el usuario se encuentra atrapado en el CNA
   const [estaEnCNA, setEstaEnCNA] = useState(false);
 
   const macCliente = parametros.get("clientMac") || macDePrueba;
@@ -37,12 +37,11 @@ function ContenidoPortal() {
   const nombreSsid = parametros.get("ssidName") ?? "";
   const nombreSitio = parametros.get("site") ?? "";
 
-  // Detección y redirección automática para escapar del entorno aislado CNA
+  // Detección y escape del Captive Network Assistant (CNA)
   useEffect(() => {
     const ua = navigator.userAgent || navigator.vendor || window.opera;
     let cnaDetectado = false;
 
-    // Validación para ecosistema iOS
     if (/iPhone|iPad|iPod/i.test(ua)) {
       if (navigator.standalone || /CriOS/i.test(ua) || /FxiOS/i.test(ua)) {
         cnaDetectado = false;
@@ -51,7 +50,6 @@ function ContenidoPortal() {
       }
     }
 
-    // Validación para ecosistema Android
     if (/Android/i.test(ua)) {
       if (/wv/i.test(ua) || (/Version\/[0-9\.]+/i.test(ua) && /Chrome\/[0-9\.]+/i.test(ua) === false)) {
         cnaDetectado = true;
@@ -85,6 +83,7 @@ function ContenidoPortal() {
     }
     setMacDePrueba(mac);
 
+    // Carga configuración de medios de pago
     fetch("/api/config-publica")
       .then((r) => r.json())
       .then((datos) => setConfig(datos))
@@ -98,6 +97,7 @@ function ContenidoPortal() {
       return;
     }
 
+    // Verifica si esta MAC ya tiene acceso activo
     fetch("/api/verificar-acceso", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -112,6 +112,7 @@ function ContenidoPortal() {
       .then((datos) => {
         if (datos.tieneAcceso) {
           setAccesoAutomatico(true);
+          // Redirigir a la URL original si existe
           const redirect = parametros.get("redirectUrl");
           if (redirect) {
             setTimeout(() => {
@@ -208,6 +209,7 @@ function ContenidoPortal() {
 
   const ocupado = cargando !== null;
 
+  // Pantalla de verificando acceso
   if (verificando) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center bg-[#0A0A0C]">
@@ -217,6 +219,7 @@ function ContenidoPortal() {
     );
   }
 
+  // Pantalla de acceso automático reconocido
   if (accesoAutomatico) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center px-5 bg-[#0A0A0C]">
@@ -235,6 +238,7 @@ function ContenidoPortal() {
     <main className="min-h-screen flex flex-col items-center px-5 py-9 bg-[#0A0A0C]">
       <div className="w-full max-w-sm">
 
+        {/* CARTEL DE RESPALDO MANUAL PARA ESCAPAR DEL CNA */}
         {estaEnCNA && (
           <div className="w-full p-4 mb-6 bg-[#211A2B] border border-amber-500/40 text-amber-200 text-center rounded-2xl shadow-md">
             <p className="font-bold text-sm text-amber-400">⚠️ IMPORTANTE PARA MERCADO PAGO</p>
@@ -268,7 +272,3 @@ function ContenidoPortal() {
           <div className="w-16 h-16 rounded-full bg-[#6E3FA3] flex items-center justify-center mx-auto">
             <span className="text-white text-3xl font-medium">S</span>
           </div>
-          <p className="text-white text-xl font-medium mt-4 mb-1">Surcante WiFi</p>
-          <p className="text-[#A0A0A8] text-[13px]">Tu viaje, conectado</p>
-        </div>
-
