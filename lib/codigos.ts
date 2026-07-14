@@ -7,11 +7,16 @@ export type Codigo = {
   creadoEn: number;
   usadoEn: number | null;
   clientMac: string | null;
-  creadoPor: string; // iniciales del admin que lo generó
+  creadoPor: string;
+  duracionMinutos: number;
 };
 
 const PREFIJO_CODIGO = "codigo:";
+const PREFIJO_MAC = "mac:";
 const SET_CODIGOS = "codigos:todos";
+
+// Duración por defecto de códigos: 1 año
+const UN_ANIO_EN_MINUTOS = 60 * 24 * 365;
 
 function generarCodigo(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -29,9 +34,10 @@ export async function crearCodigo(creadoPor: string = "ADMIN"): Promise<Codigo> 
     usadoEn: null,
     clientMac: null,
     creadoPor,
+    duracionMinutos: UN_ANIO_EN_MINUTOS,
   };
   const key = `${PREFIJO_CODIGO}${codigo.codigo}`;
-  await redis.set(key, JSON.stringify(codigo), { ex: 60 * 60 * 24 * 365 }); // 1 año
+  await redis.set(key, JSON.stringify(codigo), { ex: 60 * 60 * 24 * 400 });
   await redis.sadd(SET_CODIGOS, codigo.codigo);
   return codigo;
 }
@@ -53,7 +59,17 @@ export async function usarCodigo(
 
   codigo.usadoEn = Date.now();
   codigo.clientMac = clientMac;
-  await redis.set(key, JSON.stringify(codigo), { ex: 60 * 60 * 24 * 365 });
+  await redis.set(key, JSON.stringify(codigo), { ex: 60 * 60 * 24 * 400 });
+
+  // Guardamos por MAC para reconexión automática
+  const macKey = `${PREFIJO_MAC}${clientMac}`;
+  await redis.set(macKey, JSON.stringify({
+    usadoEn: codigo.usadoEn,
+    duracionMinutos: codigo.duracionMinutos,
+    tipo: "codigo",
+    codigo: codigoStr,
+  }), { ex: 60 * 60 * 24 * 400 });
+
   return { exito: true };
 }
 
