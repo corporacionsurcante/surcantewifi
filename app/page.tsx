@@ -93,126 +93,107 @@ function ContenidoPortal() {
     return /iPad|iPhone|iPod/.test(navigator.userAgent) && !("MSStream" in window);
   }
 
-  // Intenta abrir URL en la ventana/popup (ya creada para preservar gesto).
-  // Implementa intent:// para Android y esquema mercadopago:// para iOS con fallback al URL https.
+  // Esta función escribe una página intermedia en la ventana popup que:
+  // - intenta abrir el esquema/intent de la app nativa,
+  // - muestra un botón visible,
+  // - hace fallback al url https si no se abre la app.
   function abrirUrlConEstrategias(url: string, popup: Window | null) {
     console.log("[abrirUrlConEstrategias] url:", url, "isAndroid:", isAndroid(), "isiOS:", isiOS(), "popup:", !!popup);
 
-    // Si hay popup (creado sincrónicamente), usarlo primero.
-    if (popup) {
-      try {
-        if (isAndroid()) {
-          // Construir intent para intentar abrir la app de Mercado Pago en Android.
-          // Nota: el formato puede variar por app/version; usamos browser_fallback_url para volver al https.
-          const withoutScheme = url.replace(/^https?:\/\//, "");
-          const intentUrl = `intent://${withoutScheme}#Intent;scheme=https;package=com.mercadolibre.android;S.browser_fallback_url=${encodeURIComponent(
-            url
-          )};end`;
-          console.log("[abrirUrlConEstrategias] intentando intent Android:", intentUrl);
+    const intermediateHtml = (appAttemptUrl: string, fallbackUrl: string) => `<!doctype html>
+    <html>
+    <head>
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      <style>
+        body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;display:flex;align-items:center;justify-content:center;height:100vh;background:#0A0A0C;color:#fff;margin:0}
+        .box{max-width:420px;padding:20px;border-radius:12px;background:#111;box-shadow:0 6px 18px rgba(0,0,0,.6);text-align:center}
+        a.btn{display:inline-block;margin-top:14px;padding:10px 16px;border-radius:8px;background:#6E3FA3;color:#fff;text-decoration:none}
+        p.small{color:#A0A0A8;font-size:13px;margin-top:8px}
+      </style>
+    </head>
+    <body>
+      <div class="box">
+        <div>
+          <strong>Abrir en aplicación</strong>
+          <p class="small">Estamos intentando abrir la aplicación nativa. Si no sucede automáticamente, tocá el botón abajo.</p>
+          <a id="openBtn" class="btn" href="${fallbackUrl}" target="_blank" rel="noopener noreferrer">Abrir enlace de pago</a>
+          <p class="small">Si el botón no funciona, volvé y probá desde otro navegador.</p>
+        </div>
+      </div>
+
+      <script>
+        (function(){
+          var opened = false;
+          var fallback = ${JSON.stringify(fallbackUrl)};
+          var attempt = ${JSON.stringify(appAttemptUrl)};
+          console.log("intermediate: attempt:", attempt);
+
           try {
-            popup.location.href = intentUrl;
-            // fallback: si no se abre la app, después de 1s cargamos el https normal
-            setTimeout(() => {
-              try {
-                popup.location.href = url;
-              } catch (e) {
-                console.log("[abrirUrlConEstrategias] fallback popup -> url failed", e);
-              }
-            }, 1200);
-            return;
-          } catch (e) {
-            console.log("[abrirUrlConEstrategias] fallo al asignar intent en popup", e);
+            window.location.href = attempt;
+            opened = true;
+          } catch(e) {
+            console.warn("assign attempt failed", e);
           }
-        }
 
-        if (isiOS()) {
-          // Intento esquema custom para Mercado Pago en iOS (si la app lo soporta).
-          // No hay garantía: depende de la existencia del esquema. Ajustar si tenés un esquema oficial.
-          const appScheme = `mercadopago://payment?url=${encodeURIComponent(url)}`;
-          console.log("[abrirUrlConEstrategias] intentando scheme iOS:", appScheme);
-          try {
-            popup.location.href = appScheme;
-            // fallback a https después de un timeout corto
-            setTimeout(() => {
-              try {
-                popup.location.href = url;
-              } catch (e) {
-                console.log("[abrirUrlConEstrategias] fallback popup -> url failed", e);
+          setTimeout(function(){
+            try {
+              if (location.href === attempt || !opened) {
+                location.href = fallback;
               }
-            }, 1200);
-            return;
-          } catch (e) {
-            console.log("[abrirUrlConEstrategias] fallo al asignar scheme en popup", e);
+            } catch(e) {
+              console.warn("fallback redirect failed", e);
+              try { window.open(fallback, "_blank"); } catch(err) {}
+            }
+          }, 1100);
+
+          var btn = document.getElementById("openBtn");
+          if(btn) {
+            btn.addEventListener("click", function(e){
+              e.preventDefault();
+              try { location.href = attempt; } catch(e) { location.href = fallback; }
+            });
           }
-        }
+        })();
+      </script>
+    </body>
+    </html>`;
 
-        // Para otros casos o si esquemas fallan, navegar directamente al URL
-        try {
-          popup.location.href = url;
-          return;
-        } catch (e) {
-          console.log("[abrirUrlConEstrategias] asignar popup.location.href directo falló", e);
-        }
-      } catch (e) {
-        console.log("[abrirUrlConEstrategias] error usando popup:", e);
-      }
-    }
-
-    // Si no hay popup o los intentos con popup fallaron, intentar abrir por otros medios:
-
-    // 1) Intent Android directo en la ventana actual (puede forzar abrir la app)
+    // Construir attempt URL según plataforma
+    let attemptUrl = url;
     if (isAndroid()) {
       const withoutScheme = url.replace(/^https?:\/\//, "");
-      const intentUrl = `intent://${withoutScheme}#Intent;scheme=https;package=com.mercadolibre.android;S.browser_fallback_url=${encodeURIComponent(
+      attemptUrl = `intent://${withoutScheme}#Intent;scheme=https;package=com.mercadolibre.android;S.browser_fallback_url=${encodeURIComponent(
         url
       )};end`;
-      try {
-        console.log("[abrirUrlConEstrategias] fallback: window.location -> intent", intentUrl);
-        window.location.href = intentUrl;
-        return;
-      } catch (e) {
-        console.log("[abrirUrlConEstrategias] fallback intent en window.location falló", e);
-      }
+    } else if (isiOS()) {
+      attemptUrl = `mercadopago://payment?url=${encodeURIComponent(url)}`;
+    } else {
+      attemptUrl = url;
     }
 
-    // 2) Intent iOS: intentar scheme (esto normalmente abre la app si está instalada)
-    if (isiOS()) {
-      const appScheme = `mercadopago://payment?url=${encodeURIComponent(url)}`;
-      try {
-        console.log("[abrirUrlConEstrategias] fallback: window.location -> scheme iOS", appScheme);
-        window.location.href = appScheme;
-        // como fallback, despues de un breve delay iremos al https
-        setTimeout(() => {
-          try {
-            window.location.href = url;
-          } catch (e) {
-            console.log("[abrirUrlConEstrategias] fallback final -> url failed", e);
-          }
-        }, 1200);
-        return;
-      } catch (e) {
-        console.log("[abrirUrlConEstrategias] fallback scheme iOS falló", e);
-      }
-    }
-
-    // 3) Crear y "clickear" un anchor target=_blank
     try {
-      const a = document.createElement("a");
-      a.href = url;
-      a.target = "_blank";
-      a.rel = "noopener noreferrer";
-      document.body.appendChild(a);
-      console.log("[abrirUrlConEstrategias] fallback: anchor click");
-      a.click();
-      a.remove();
+      if (popup && !popup.closed) {
+        popup.document.open();
+        popup.document.write(intermediateHtml(attemptUrl, url));
+        popup.document.close();
+        return;
+      }
+    } catch (e) {
+      console.warn("[abrirUrlConEstrategias] escribir en popup falló", e);
+    }
+
+    try {
+      const html = intermediateHtml(attemptUrl, url);
+      const blob = new Blob([html], { type: "text/html" });
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, "_blank", "noopener,noreferrer");
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
       return;
     } catch (e) {
-      console.log("[abrirUrlConEstrategias] fallback anchor click falló", e);
+      console.warn("[abrirUrlConEstrategias] abrir blobUrl falló", e);
     }
 
-    // 4) Último recurso: navegar en la misma pestaña
     try {
-      console.log("[abrirUrlConEstrategias] última opción: window.location.href =", url);
       window.location.href = url;
     } catch (e) {
       console.error("[abrirUrlConEstrategias] no se pudo abrir la url por ningún medio", e);
@@ -224,11 +205,9 @@ function ContenidoPortal() {
     setError(null);
     setCargando(medio);
 
-    // Abrimos una ventana en blanco de forma sincrónica dentro del handler click para preservar el gesto
     let ventanaPopup: Window | null = null;
     try {
       ventanaPopup = window.open("", "_blank", "noopener,noreferrer");
-      // En algunos contextos la ventana puede devolver with about:blank que es suficiente.
     } catch (e) {
       console.log("[pagar] window.open falló", e);
       ventanaPopup = null;
@@ -266,7 +245,6 @@ function ContenidoPortal() {
     setError(null);
     setCargando("whatsapp");
 
-    // Abrir ventana en blanco sincrónica
     let ventanaPopup: Window | null = null;
     try {
       ventanaPopup = window.open("", "_blank", "noopener,noreferrer");
@@ -291,9 +269,7 @@ function ContenidoPortal() {
       if (!respuesta.ok) throw new Error("Error al iniciar el pago");
       const datos = await respuesta.json();
       const planActual = PLANES.find((p) => p.id === planSeleccionado) ?? PLANES[1];
-      const mensaje = `🛜 Mi link de pago WAIFAI\n${planActual.nombre} - $${planActual.precio.toLocaleString(
-        "es-AR"
-      )}\n\n${datos.urlPago}`;
+      const mensaje = `🛜 Mi link de pago WAIFAI\n${planActual.nombre} - $${planActual.precio.toLocaleString("es-AR")}\n\n${datos.urlPago}`;
       const waUrl = `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
 
       abrirUrlConEstrategias(waUrl, ventanaPopup);
