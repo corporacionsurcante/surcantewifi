@@ -93,125 +93,44 @@ function ContenidoPortal() {
     return /iPad|iPhone|iPod/.test(navigator.userAgent) && !("MSStream" in window);
   }
 
-  // Esta función escribe una página intermedia en la ventana popup que:
-  // - intenta abrir el esquema/intent de la app nativa,
-  // - muestra un botón visible,
-  // - hace fallback al url https si no se abre la app.
-  function abrirUrlConEstrategias(url: string, popup: Window | null) {
-    console.log("[abrirUrlConEstrategias] url:", url, "isAndroid:", isAndroid(), "isiOS:", isiOS(), "popup:", !!popup);
+  // Simple helper to try to open a URL via app intent or scheme in the same tab
+  function abrirUrlConEstrategias(url: string) {
+    console.log("[abrirUrlConEstrategias] navegando misma pestaña a intermedio para:", url, "isAndroid:", isAndroid(), "isiOS:", isiOS());
 
-    const intermediateHtml = (appAttemptUrl: string, fallbackUrl: string) => `<!doctype html>
-    <html>
-    <head>
-      <meta name="viewport" content="width=device-width,initial-scale=1">
-      <style>
-        body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;display:flex;align-items:center;justify-content:center;height:100vh;background:#0A0A0C;color:#fff;margin:0}
-        .box{max-width:420px;padding:20px;border-radius:12px;background:#111;box-shadow:0 6px 18px rgba(0,0,0,.6);text-align:center}
-        a.btn{display:inline-block;margin-top:14px;padding:10px 16px;border-radius:8px;background:#6E3FA3;color:#fff;text-decoration:none}
-        p.small{color:#A0A0A8;font-size:13px;margin-top:8px}
-      </style>
-    </head>
-    <body>
-      <div class="box">
-        <div>
-          <strong>Abrir en aplicación</strong>
-          <p class="small">Estamos intentando abrir la aplicación nativa. Si no sucede automáticamente, tocá el botón abajo.</p>
-          <a id="openBtn" class="btn" href="${fallbackUrl}" target="_blank" rel="noopener noreferrer">Abrir enlace de pago</a>
-          <p class="small">Si el botón no funciona, volvé y probá desde otro navegador.</p>
-        </div>
-      </div>
+    // If non-mobile, just go directly
+    if (!isAndroid() && !isiOS()) {
+      try { window.location.href = url; return; } catch (e) { console.error(e); }
+    }
 
-      <script>
-        (function(){
-          var opened = false;
-          var fallback = ${JSON.stringify(fallbackUrl)};
-          var attempt = ${JSON.stringify(appAttemptUrl)};
-          console.log("intermediate: attempt:", attempt);
-
-          try {
-            window.location.href = attempt;
-            opened = true;
-          } catch(e) {
-            console.warn("assign attempt failed", e);
-          }
-
-          setTimeout(function(){
-            try {
-              if (location.href === attempt || !opened) {
-                location.href = fallback;
-              }
-            } catch(e) {
-              console.warn("fallback redirect failed", e);
-              try { window.open(fallback, "_blank"); } catch(err) {}
-            }
-          }, 1100);
-
-          var btn = document.getElementById("openBtn");
-          if(btn) {
-            btn.addEventListener("click", function(e){
-              e.preventDefault();
-              try { location.href = attempt; } catch(e) { location.href = fallback; }
-            });
-          }
-        })();
-      </script>
-    </body>
-    </html>`;
-
-    // Construir attempt URL según plataforma
+    // Build attempt URL
     let attemptUrl = url;
     if (isAndroid()) {
       const withoutScheme = url.replace(/^https?:\/\//, "");
-      attemptUrl = `intent://${withoutScheme}#Intent;scheme=https;package=com.mercadolibre.android;S.browser_fallback_url=${encodeURIComponent(
-        url
-      )};end`;
+      attemptUrl = `intent://${withoutScheme}#Intent;scheme=https;package=com.mercadolibre.android;S.browser_fallback_url=${encodeURIComponent(url)};end`;
     } else if (isiOS()) {
       attemptUrl = `mercadopago://payment?url=${encodeURIComponent(url)}`;
-    } else {
-      attemptUrl = url;
     }
 
+    // Try to navigate to the attempt directly (top-level)
     try {
-      if (popup && !popup.closed) {
-        popup.document.open();
-        popup.document.write(intermediateHtml(attemptUrl, url));
-        popup.document.close();
-        return;
-      }
-    } catch (e) {
-      console.warn("[abrirUrlConEstrategias] escribir en popup falló", e);
-    }
-
-    try {
-      const html = intermediateHtml(attemptUrl, url);
-      const blob = new Blob([html], { type: "text/html" });
-      const blobUrl = URL.createObjectURL(blob);
-      window.open(blobUrl, "_blank", "noopener,noreferrer");
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+      window.location.href = attemptUrl;
+      // After short delay, if still at attemptUrl, navigate to fallback
+      setTimeout(() => {
+        try { if (window.location.href === attemptUrl) window.location.href = url; } catch(e){}
+      }, 1200);
       return;
     } catch (e) {
-      console.warn("[abrirUrlConEstrategias] abrir blobUrl falló", e);
+      console.warn('[abrirUrlConEstrategias] direct attempt failed', e);
     }
 
-    try {
-      window.location.href = url;
-    } catch (e) {
-      console.error("[abrirUrlConEstrategias] no se pudo abrir la url por ningún medio", e);
-    }
+    // Final fallback
+    try { window.location.href = url; } catch (e) { console.error('[abrirUrlConEstrategias] final fallback failed', e); }
   }
 
-  // --- Pago (abre una ventana en blanco sincrónica para preservar el gesto del usuario) ---
+  // --- Pago (navegar misma pestaña al link de pago para evitar about:blank) ---
   async function pagar(medio: "mp" | "nave") {
     setError(null);
     setCargando(medio);
-
-    let ventanaPopup: Window | null = null;
-    try {
-      ventanaPopup = window.open("", "_blank");
-    } catch (e) {
-      console.log("[pagar] window.open falló", e);
-      ventanaPopup = null;
-    }
 
     try {
       const endpoint = medio === "nave" ? "/api/crear-pago-nave" : "/api/crear-pago";
@@ -232,7 +151,9 @@ function ContenidoPortal() {
 
       const urlPago = datos.urlPago;
       if (!urlPago) throw new Error("No se recibió urlPago");
-      abrirUrlConEstrategias(urlPago, ventanaPopup);
+
+      // Direct navigation to the payment URL in the same tab (avoids about:blank)
+      window.location.href = urlPago;
     } catch (e) {
       console.error("[pagar] error:", e);
       setError("Hubo un problema al iniciar el pago. Probá de nuevo.");
@@ -240,18 +161,10 @@ function ContenidoPortal() {
     }
   }
 
-  // --- Pago por WhatsApp (mismo enfoque para preservar gesto) ---
+  // --- Pago por WhatsApp (navegar misma pestaña al link de WA) ---
   async function pagarPorWhatsApp() {
     setError(null);
     setCargando("whatsapp");
-
-    let ventanaPopup: Window | null = null;
-    try {
-      ventanaPopup = window.open("", "_blank");
-    } catch (e) {
-      console.log("[pagarPorWhatsApp] window.open falló", e);
-      ventanaPopup = null;
-    }
 
     try {
       const respuesta = await fetch("/api/crear-pago", {
@@ -272,7 +185,7 @@ function ContenidoPortal() {
       const mensaje = `🛜 Mi link de pago WAIFAI\n${planActual.nombre} - $${planActual.precio.toLocaleString("es-AR")}\n\n${datos.urlPago}`;
       const waUrl = `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
 
-      abrirUrlConEstrategias(waUrl, ventanaPopup);
+      window.location.href = waUrl;
     } catch (e) {
       console.error("[pagarPorWhatsApp] error:", e);
       setError("Hubo un problema. Probá de nuevo.");
