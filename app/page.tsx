@@ -93,41 +93,62 @@ function ContenidoPortal() {
     return /iPad|iPhone|iPod/.test(navigator.userAgent) && !("MSStream" in window);
   }
 
-  // Simple helper to try to open a URL via app intent or scheme in the same tab
-  function abrirUrlConEstrategias(url: string) {
-    console.log("[abrirUrlConEstrategias] navegando misma pestaña a intermedio para:", url, "isAndroid:", isAndroid(), "isiOS:", isiOS());
+  function buildIntermediateHtml(appAttemptUrl: string, fallbackUrl: string) {
+    return `<!doctype html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;display:flex;align-items:center;justify-content:center;height:100vh;background:#0A0A0C;color:#fff;margin:0}
+  .box{max-width:420px;padding:20px;border-radius:12px;background:#111;box-shadow:0 6px 18px rgba(0,0,0,.6);text-align:center}
+  a.btn{display:inline-block;margin-top:14px;padding:10px 16px;border-radius:8px;background:#6E3FA3;color:#fff;text-decoration:none}
+  p.small{color:#A0A0A8;font-size:13px;margin-top:8px}
+  .muted{color:#A0A0A8;font-size:13px;margin-top:6px}
+  .copy{background:#222;padding:8px 12px;border-radius:8px;margin-top:10px;display:inline-block}
+</style>
+</head>
+<body>
+  <div class="box">
+    <div>
+      <strong>Abrir en aplicación</strong>
+      <p class="muted">Si la app está instalada, intentaremos abrirla. Si no, podés abrir el enlace en el navegador o copiarlo.</p>
+      <div style="margin-top:12px">
+        <a id="openApp" class="btn" href="${appAttemptUrl}">Abrir en app</a>
+      </div>
+      <div style="margin-top:8px">
+        <a id="openWeb" class="btn" href="${fallbackUrl}" target="_blank" rel="noopener noreferrer">Abrir en navegador</a>
+      </div>
+      <div style="margin-top:8px">
+        <button id="copyBtn" class="btn">Copiar enlace</button>
+      </div>
+      <div class="muted">Si el botón no funciona, abrí este enlace en Chrome/Safari desde el menú del navegador.</div>
+      <div id="linkBox" class="copy">${fallbackUrl}</div>
+    </div>
+  </div>
 
-    // If non-mobile, just go directly
-    if (!isAndroid() && !isiOS()) {
-      try { window.location.href = url; return; } catch (e) { console.error(e); }
-    }
+  <script>
+    (function(){
+      var attempt = ${JSON.stringify(appAttemptUrl)};
+      var fallback = ${JSON.stringify(fallbackUrl)};
 
-    // Build attempt URL
-    let attemptUrl = url;
-    if (isAndroid()) {
-      const withoutScheme = url.replace(/^https?:\/\//, "");
-      attemptUrl = `intent://${withoutScheme}#Intent;scheme=https;package=com.mercadolibre.android;S.browser_fallback_url=${encodeURIComponent(url)};end`;
-    } else if (isiOS()) {
-      attemptUrl = `mercadopago://payment?url=${encodeURIComponent(url)}`;
-    }
+      document.getElementById('copyBtn').addEventListener('click', function(){
+        try { navigator.clipboard.writeText(fallback); alert('Enlace copiado'); } catch(e){ prompt('Copiá este enlace', fallback); }
+      });
 
-    // Try to navigate to the attempt directly (top-level)
-    try {
-      window.location.href = attemptUrl;
-      // After short delay, if still at attemptUrl, navigate to fallback
-      setTimeout(() => {
-        try { if (window.location.href === attemptUrl) window.location.href = url; } catch(e){}
-      }, 1200);
-      return;
-    } catch (e) {
-      console.warn('[abrirUrlConEstrategias] direct attempt failed', e);
-    }
+      // Try opening the app first by navigating top-level
+      try {
+        location.href = attempt;
+      } catch(e){}
 
-    // Final fallback
-    try { window.location.href = url; } catch (e) { console.error('[abrirUrlConEstrategias] final fallback failed', e); }
+      // If still here after 1s, show the fallback (already visible)
+      setTimeout(function(){ try{ if(location.href===attempt) location.href = fallback; }catch(e){} }, 1200);
+    })();
+  </script>
+</body>
+</html>`;
   }
 
-  // --- Pago (navegar misma pestaña al link de pago para evitar about:blank) ---
+  // --- Pago (navegar a intersticial que intenta abrir app y ofrece opciones) ---
   async function pagar(medio: "mp" | "nave") {
     setError(null);
     setCargando(medio);
@@ -152,8 +173,24 @@ function ContenidoPortal() {
       const urlPago = datos.urlPago;
       if (!urlPago) throw new Error("No se recibió urlPago");
 
-      // Direct navigation to the payment URL in the same tab (avoids about:blank)
-      window.location.href = urlPago;
+      // Build attempt URL for app based on platform
+      let attemptUrl = urlPago;
+      if (isAndroid()) {
+        const withoutScheme = urlPago.replace(/^https?:\/\//, "");
+        attemptUrl = `intent://${withoutScheme}#Intent;scheme=https;package=com.mercadolibre.android;S.browser_fallback_url=${encodeURIComponent(urlPago)};end`;
+      } else if (isiOS()) {
+        attemptUrl = `mercadopago://payment?url=${encodeURIComponent(urlPago)}`;
+      }
+
+      const html = buildIntermediateHtml(attemptUrl, urlPago);
+      const blob = new Blob([html], { type: 'text/html' });
+      const blobUrl = URL.createObjectURL(blob);
+
+      // Navigate top-level to blob interstitial (avoids about:blank popups)
+      window.location.href = blobUrl;
+
+      // Revoke later
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 20000);
     } catch (e) {
       console.error("[pagar] error:", e);
       setError("Hubo un problema al iniciar el pago. Probá de nuevo.");
@@ -161,7 +198,7 @@ function ContenidoPortal() {
     }
   }
 
-  // --- Pago por WhatsApp (navegar misma pestaña al link de WA) ---
+  // --- Pago por WhatsApp: mostrar interstitial con wa link ---
   async function pagarPorWhatsApp() {
     setError(null);
     setCargando("whatsapp");
@@ -185,7 +222,12 @@ function ContenidoPortal() {
       const mensaje = `🛜 Mi link de pago WAIFAI\n${planActual.nombre} - $${planActual.precio.toLocaleString("es-AR")}\n\n${datos.urlPago}`;
       const waUrl = `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
 
-      window.location.href = waUrl;
+      const attemptUrl = waUrl; // WhatsApp web will handle
+      const html = buildIntermediateHtml(attemptUrl, waUrl);
+      const blob = new Blob([html], { type: 'text/html' });
+      const blobUrl = URL.createObjectURL(blob);
+      window.location.href = blobUrl;
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 20000);
     } catch (e) {
       console.error("[pagarPorWhatsApp] error:", e);
       setError("Hubo un problema. Probá de nuevo.");
@@ -260,112 +302,4 @@ function ContenidoPortal() {
               CONECTADO A WIFI SURCANTE
             </span>
           </div>
-          <div className="w-16 h-16 rounded-full bg-[#6E3FA3] flex items-center justify-center mx-auto">
-            <span className="text-white text-3xl font-medium">S</span>
-          </div>
-          <p className="text-white text-xl font-medium mt-4 mb-1">Surcante WiFi</p>
-          <p className="text-[#A0A0A8] text-[13px]">Tu viaje, conectado</p>
-        </div>
 
-        <p className="text-xs font-medium text-[#8B5FBF] uppercase tracking-wide mb-3">
-          Elegí tu plan
-        </p>
-
-        <div className="flex flex-col gap-2.5">
-          {PLANES.map((plan) => (
-            <button
-              key={plan.id}
-              onClick={() => setPlanSeleccionado(plan.id)}
-              className={`flex items-center justify-between rounded-2xl px-4 py-3.5 text-left transition border ${
-                planSeleccionado === plan.id
-                  ? "bg-[#211A2B] border-[#8B5FBF]"
-                  : "bg-[#18181B] border-[#2A2A2E]"
-              }`}
-            >
-              <div>
-                <p className="text-[14px] font-medium text-white">{plan.nombre}</p>
-                <p className="text-[13px] text-[#A0A0A8] mt-0.5">{plan.descripcion}</p>
-              </div>
-              <p className="text-[18px] font-medium text-white whitespace-nowrap ml-3">
-                ${plan.precio.toLocaleString("es-AR")}
-              </p>
-            </button>
-          ))}
-        </div>
-
-        {error && (
-          <p className="text-sm text-red-400 mt-4 text-center">{error}</p>
-        )}
-
-        <p className="text-xs text-[#A0A0A8] text-center mt-5 mb-3">Elegí cómo pagar</p>
-
-        {config.nave && (
-          <button
-            onClick={() => pagar("nave")}
-            disabled={ocupado}
-            className="w-full py-3.5 rounded-xl text-[15px] font-medium bg-[#6E3FA3] hover:bg-[#5A3286] active:scale-[0.98] transition disabled:opacity-60 mb-2.5"
-          >
-            {cargando === "nave" ? "Abriendo pago..." : "Pagar con Nave / Galicia"}
-          </button>
-        )}
-
-        {config.mp && (
-          <button
-            onClick={() => pagar("mp")}
-            disabled={ocupado}
-            className="w-full py-3.5 rounded-xl text-[15px] font-medium bg-[#18181B] border border-[#2A2A2E] hover:bg-[#211A2B] active:scale-[0.98] transition disabled:opacity-60 mb-2.5"
-          >
-            {cargando === "mp" ? "Abriendo pago..." : "Pagar con Mercado Pago"}
-          </button>
-        )}
-
-        {config.whatsapp && (
-          <button
-            onClick={pagarPorWhatsApp}
-            disabled={ocupado}
-            className="w-full py-3.5 rounded-xl text-[15px] font-medium bg-[#18181B] border border-[#25D366] text-[#25D366] hover:bg-[#0d1f14] active:scale-[0.98] transition disabled:opacity-60"
-          >
-            {cargando === "whatsapp" ? "Generando link..." : "📲 Pagar por WhatsApp"}
-          </button>
-        )}
-
-        <p className="text-[11px] text-[#5A5A60] text-center mt-4">
-          Al continuar aceptás los términos de servicio · Surcante
-        </p>
-
-        {!mostrarCodigo ? (
-          <button
-            onClick={() => setMostrarCodigo(true)}
-            className="block w-full text-center text-[12px] text-[#5A5A60] mt-6 underline"
-          >
-            ¿Tenés un código de acceso?
-          </button>
-        ) : (
-          <div className="mt-6 pt-5 border-t border-[#2A2A2E]">
-            <p className="text-[12px] text-[#A0A0A8] mb-2 text-center">
-              Ingresá tu código de acceso
-            </p>
-            <input
-              type="text"
-              value={codigo}
-              onChange={(e) => setCodigo(e.target.value.toUpperCase())}
-              placeholder="XXXX-XXXX"
-              className="w-full px-4 py-3 rounded-xl bg-[#18181B] border border-[#2A2A2E] text-white text-center font-mono tracking-wide mb-2"
-            />
-            {errorCodigo && (
-              <p className="text-sm text-red-400 mb-2 text-center">{errorCodigo}</p>
-            )}
-            <button
-              onClick={canjearCodigo}
-              disabled={canjeando || !codigo}
-              className="w-full py-3 rounded-xl text-[14px] font-medium bg-[#18181B] border border-[#2A2A2E] hover:bg-[#211A2B] transition disabled:opacity-60"
-            >
-              {canjeando ? "Validando..." : "Usar código"}
-            </button>
-          </div>
-        )}
-
-      </div>
-    </main>
-  );
-}
