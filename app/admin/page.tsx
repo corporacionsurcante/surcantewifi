@@ -80,7 +80,7 @@ export default function PanelAdmin() {
   const [cargandoDispositivos, setCargandoDispositivos] = useState(false);
   const [cargandoPaquetes, setCargandoPaquetes] = useState(false);
   const [editandoPlan, setEditandoPlan] = useState<PlanData | null>(null);
-  const [guarandoPlan, setGuardandoPlan] = useState(false);
+  const [guardandoPlan, setGuardandoPlan] = useState(false);
   const [nuevoNombre, setNuevoNombre] = useState("");
   const [nuevoDescripcion, setNuevoDescripcion] = useState("");
   const [nuevoPrecio, setNuevoPrecio] = useState("");
@@ -481,9 +481,9 @@ export default function PanelAdmin() {
                 />
               </div>
               <button onClick={() => crearPlan(nuevoNombre, nuevoDescripcion, Number(nuevoPrecio), Number(nuevaDuracion))}
-                disabled={guarandoPlan || !nuevoNombre || !nuevoPrecio || !nuevaDuracion}
+                disabled={guardandoPlan || !nuevoNombre || !nuevoPrecio || !nuevaDuracion}
                 className="w-full py-2.5 rounded-xl bg-[#6E3FA3] text-white text-sm font-medium disabled:opacity-60">
-                {guarandoPlan ? "Guardando..." : "Crear paquete"}
+                {guardandoPlan ? "Guardando..." : "Crear paquete"}
               </button>
             </div>
 
@@ -537,7 +537,7 @@ export default function PanelAdmin() {
                           duracionMinutos: Number(nuevaDuracion) || editandoPlan.duracionMinutos,
                           descuento: Number(nuevoDescuento) || editandoPlan.descuento,
                         })}
-                          disabled={guarandoPlan}
+                          disabled={guardandoPlan}
                           className="flex-1 py-2 rounded-xl bg-green-600 text-white text-sm font-medium disabled:opacity-60">
                           Guardar
                         </button>

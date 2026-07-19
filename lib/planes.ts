@@ -10,6 +10,45 @@ export type Plan = {
   actualizadoEn?: number;
 };
 
+export function obtenerPlanesPredeterminados(): Plan[] {
+  const ahora = Date.now();
+  return [
+    {
+      id: "pack-6h",
+      nombre: "Pack 6 horas",
+      descripcion: "Ideal para tramos cortos y medios",
+      precio: 5000,
+      duracionMinutos: 360,
+      activo: true,
+      descuento: 0,
+      creadoEn: ahora,
+      actualizadoEn: ahora,
+    },
+    {
+      id: "pack-12h",
+      nombre: "Pack 12 horas",
+      descripcion: "Para viajes de media distancia",
+      precio: 8000,
+      duracionMinutos: 720,
+      activo: true,
+      descuento: 0,
+      creadoEn: ahora,
+      actualizadoEn: ahora,
+    },
+    {
+      id: "pack-24h",
+      nombre: "Pack 24 horas",
+      descripcion: "Para los viajes más largos",
+      precio: 12000,
+      duracionMinutos: 1440,
+      activo: true,
+      descuento: 0,
+      creadoEn: ahora,
+      actualizadoEn: ahora,
+    },
+  ];
+}
+
 export const PLANES_PREDETERMINADOS: Plan[] = [
   {
     id: "pack-6h",
@@ -19,8 +58,6 @@ export const PLANES_PREDETERMINADOS: Plan[] = [
     duracionMinutos: 360,
     activo: true,
     descuento: 0,
-    creadoEn: Date.now(),
-    actualizadoEn: Date.now(),
   },
   {
     id: "pack-12h",
@@ -30,8 +67,6 @@ export const PLANES_PREDETERMINADOS: Plan[] = [
     duracionMinutos: 720,
     activo: true,
     descuento: 0,
-    creadoEn: Date.now(),
-    actualizadoEn: Date.now(),
   },
   {
     id: "pack-24h",
@@ -41,8 +76,6 @@ export const PLANES_PREDETERMINADOS: Plan[] = [
     duracionMinutos: 1440,
     activo: true,
     descuento: 0,
-    creadoEn: Date.now(),
-    actualizadoEn: Date.now(),
   },
 ];
 
