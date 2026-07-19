@@ -48,6 +48,18 @@ type ClienteData = {
   señal: number;
 };
 
+type PlanData = {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  precio: number;
+  duracionMinutos: number;
+  activo: boolean;
+  descuento: number;
+  creadoEn?: number;
+  actualizadoEn?: number;
+};
+
 export default function PanelAdmin() {
   const [clave, setClave] = useState("");
   const [autenticado, setAutenticado] = useState(false);
@@ -58,13 +70,22 @@ export default function PanelAdmin() {
   const [codigos, setCodigos] = useState<CodigoData[]>([]);
   const [aps, setAps] = useState<APData[]>([]);
   const [clientes, setClientes] = useState<ClienteData[]>([]);
-  const [tab, setTab] = useState<"resumen" | "pagos" | "codigos" | "dispositivos" | "config">("resumen");
+  const [planes, setPlanes] = useState<PlanData[]>([]);
+  const [tab, setTab] = useState<"resumen" | "pagos" | "codigos" | "dispositivos" | "paquetes" | "config">("resumen");
   const [generando, setGenerando] = useState(false);
   const [cantidadCodigos, setCantidadCodigos] = useState(1);
   const [creadoPor, setCreadoPor] = useState("");
   const [config, setConfig] = useState({ nave: true, mp: true, whatsapp: true });
   const [guardandoConfig, setGuardandoConfig] = useState(false);
   const [cargandoDispositivos, setCargandoDispositivos] = useState(false);
+  const [cargandoPaquetes, setCargandoPaquetes] = useState(false);
+  const [editandoPlan, setEditandoPlan] = useState<PlanData | null>(null);
+  const [guarandoPlan, setGuardandoPlan] = useState(false);
+  const [nuevoNombre, setNuevoNombre] = useState("");
+  const [nuevoDescripcion, setNuevoDescripcion] = useState("");
+  const [nuevoPrecio, setNuevoPrecio] = useState("");
+  const [nuevaDuracion, setNuevaDuracion] = useState("");
+  const [nuevoDescuento, setNuevoDescuento] = useState("");
 
   const cargarDatos = useCallback(async (claveAdmin: string) => {
     try {
@@ -86,6 +107,16 @@ export default function PanelAdmin() {
       setClientes(d.clientes ?? []);
     } catch (e) { console.error(e); }
     finally { setCargandoDispositivos(false); }
+  }, []);
+
+  const cargarPaquetes = useCallback(async (claveAdmin: string) => {
+    setCargandoPaquetes(true);
+    try {
+      const r = await fetch("/api/admin-planes", { headers: { "x-admin-key": claveAdmin } });
+      const d = await r.json();
+      setPlanes(Array.isArray(d) ? d : []);
+    } catch (e) { console.error(e); }
+    finally { setCargandoPaquetes(false); }
   }, []);
 
   async function cargarConfig() {
@@ -116,6 +147,7 @@ export default function PanelAdmin() {
       setPagos(d.pagos);
       setCodigos(d.codigos);
       cargarConfig();
+      cargarPaquetes(claveIngresada);
     } else {
       setError("Clave incorrecta");
     }
@@ -133,6 +165,58 @@ export default function PanelAdmin() {
     } finally { setGenerando(false); }
   }
 
+  async function guardarPlan(plan: PlanData) {
+    setGuardandoPlan(true);
+    try {
+      const r = await fetch("/api/admin-planes", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-admin-key": clave },
+        body: JSON.stringify(plan),
+      });
+      if (r.ok) {
+        await cargarPaquetes(clave);
+        setEditandoPlan(null);
+        setNuevoNombre("");
+        setNuevoDescripcion("");
+        setNuevoPrecio("");
+        setNuevaDuracion("");
+        setNuevoDescuento("");
+      }
+    } finally { setGuardandoPlan(false); }
+  }
+
+  async function crearPlan(nombre: string, descripcion: string, precio: number, duracion: number) {
+    setGuardandoPlan(true);
+    try {
+      const r = await fetch("/api/admin-planes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-key": clave },
+        body: JSON.stringify({ nombre, descripcion, precio, duracionMinutos: duracion }),
+      });
+      if (r.ok) {
+        await cargarPaquetes(clave);
+        setNuevoNombre("");
+        setNuevoDescripcion("");
+        setNuevoPrecio("");
+        setNuevaDuracion("");
+      }
+    } finally { setGuardandoPlan(false); }
+  }
+
+  async function eliminarPlan(id: string) {
+    if (confirm("¿Está seguro que desea eliminar este plan?")) {
+      try {
+        const r = await fetch(`/api/admin-planes?id=${id}`, {
+          method: "DELETE",
+          headers: { "x-admin-key": clave },
+        });
+        if (r.ok) {
+          await cargarPaquetes(clave);
+        }
+      } catch (e) { console.error(e); }
+    }
+  }
+
   useEffect(() => {
     if (autenticado && clave) {
       const i = setInterval(() => cargarDatos(clave), 30000);
@@ -147,6 +231,12 @@ export default function PanelAdmin() {
       return () => clearInterval(i);
     }
   }, [tab, autenticado, clave, cargarDispositivos]);
+
+  useEffect(() => {
+    if (tab === "paquetes" && autenticado) {
+      cargarPaquetes(clave);
+    }
+  }, [tab, autenticado, clave, cargarPaquetes]);
 
   const formatPeso = (n: number) => "$" + n.toLocaleString("es-AR");
   const formatFecha = (ts: number) => new Date(ts).toLocaleString("es-AR", {
@@ -176,9 +266,9 @@ export default function PanelAdmin() {
     );
   }
 
-  const TABS = ["resumen", "dispositivos", "pagos", "codigos", "config"] as const;
+  const TABS = ["resumen", "dispositivos", "pagos", "codigos", "paquetes", "config"] as const;
   const LABELS: Record<string, string> = {
-    resumen: "Resumen", dispositivos: "Buses", pagos: "Pagos", codigos: "Códigos", config: "Config"
+    resumen: "Resumen", dispositivos: "Buses", pagos: "Pagos", codigos: "Códigos", paquetes: "Paquetes", config: "Config"
   };
 
   return (
@@ -357,6 +447,148 @@ export default function PanelAdmin() {
                   <p className="text-[#5A5A60] text-xs mt-1">Creado por {c.creadoPor} · {formatFecha(c.creadoEn)}</p>
                   {c.estado === "usado" && c.mac && (
                     <p className="text-[#5A5A60] text-xs mt-0.5 font-mono">{c.mac} · {c.usadoEn ? formatFecha(c.usadoEn) : ""}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {tab === "paquetes" && (
+          <div className="flex flex-col gap-4">
+            <div className="bg-[#18181B] border border-[#2A2A2E] rounded-2xl p-4">
+              <p className="text-[#A0A0A8] text-xs mb-3">Crear nuevo paquete</p>
+              <input type="text" value={nuevoNombre}
+                onChange={(e) => setNuevoNombre(e.target.value)}
+                placeholder="Nombre del paquete"
+                className="w-full px-4 py-2.5 rounded-xl bg-[#0A0A0C] border border-[#2A2A2E] text-white mb-2 text-sm"
+              />
+              <textarea value={nuevoDescripcion}
+                onChange={(e) => setNuevoDescripcion(e.target.value)}
+                placeholder="Descripción"
+                className="w-full px-4 py-2.5 rounded-xl bg-[#0A0A0C] border border-[#2A2A2E] text-white mb-2 text-sm resize-none h-20"
+              />
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                <input type="number" value={nuevoPrecio}
+                  onChange={(e) => setNuevoPrecio(e.target.value)}
+                  placeholder="Precio"
+                  className="px-4 py-2.5 rounded-xl bg-[#0A0A0C] border border-[#2A2A2E] text-white text-sm"
+                />
+                <input type="number" value={nuevaDuracion}
+                  onChange={(e) => setNuevaDuracion(e.target.value)}
+                  placeholder="Duración (minutos)"
+                  className="px-4 py-2.5 rounded-xl bg-[#0A0A0C] border border-[#2A2A2E] text-white text-sm"
+                />
+              </div>
+              <button onClick={() => crearPlan(nuevoNombre, nuevoDescripcion, Number(nuevoPrecio), Number(nuevaDuracion))}
+                disabled={guarandoPlan || !nuevoNombre || !nuevoPrecio || !nuevaDuracion}
+                className="w-full py-2.5 rounded-xl bg-[#6E3FA3] text-white text-sm font-medium disabled:opacity-60">
+                {guarandoPlan ? "Guardando..." : "Crear paquete"}
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              {cargandoPaquetes ? (
+                <p className="text-[#A0A0A8] text-center py-8">Cargando paquetes...</p>
+              ) : planes.length === 0 ? (
+                <p className="text-[#A0A0A8] text-center py-8">Sin paquetes</p>
+              ) : planes.map((p) => (
+                <div key={p.id}>
+                  {editandoPlan?.id === p.id ? (
+                    <div className="bg-[#18181B] border border-[#2A2A2E] rounded-2xl p-4">
+                      <input type="text" value={nuevoNombre || editandoPlan.nombre}
+                        onChange={(e) => setNuevoNombre(e.target.value)}
+                        className="w-full px-4 py-2.5 rounded-xl bg-[#0A0A0C] border border-[#2A2A2E] text-white mb-2 text-sm"
+                      />
+                      <textarea value={nuevoDescripcion || editandoPlan.descripcion}
+                        onChange={(e) => setNuevoDescripcion(e.target.value)}
+                        className="w-full px-4 py-2.5 rounded-xl bg-[#0A0A0C] border border-[#2A2A2E] text-white mb-2 text-sm resize-none h-20"
+                      />
+                      <div className="grid grid-cols-2 gap-2 mb-2">
+                        <input type="number" value={nuevoPrecio || editandoPlan.precio}
+                          onChange={(e) => setNuevoPrecio(e.target.value)}
+                          className="px-4 py-2.5 rounded-xl bg-[#0A0A0C] border border-[#2A2A2E] text-white text-sm"
+                        />
+                        <input type="number" value={nuevaDuracion || editandoPlan.duracionMinutos}
+                          onChange={(e) => setNuevaDuracion(e.target.value)}
+                          className="px-4 py-2.5 rounded-xl bg-[#0A0A0C] border border-[#2A2A2E] text-white text-sm"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 mb-3">
+                        <input type="number" value={nuevoDescuento || editandoPlan.descuento}
+                          onChange={(e) => setNuevoDescuento(e.target.value)}
+                          placeholder="Descuento %"
+                          className="px-4 py-2.5 rounded-xl bg-[#0A0A0C] border border-[#2A2A2E] text-white text-sm"
+                        />
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" checked={editandoPlan.activo}
+                            onChange={(e) => setEditandoPlan({...editandoPlan, activo: e.target.checked})}
+                            className="w-4 h-4"
+                          />
+                          <label className="text-white text-sm">Activo</label>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => guardarPlan({
+                          ...editandoPlan,
+                          nombre: nuevoNombre || editandoPlan.nombre,
+                          descripcion: nuevoDescripcion || editandoPlan.descripcion,
+                          precio: Number(nuevoPrecio) || editandoPlan.precio,
+                          duracionMinutos: Number(nuevaDuracion) || editandoPlan.duracionMinutos,
+                          descuento: Number(nuevoDescuento) || editandoPlan.descuento,
+                        })}
+                          disabled={guarandoPlan}
+                          className="flex-1 py-2 rounded-xl bg-green-600 text-white text-sm font-medium disabled:opacity-60">
+                          Guardar
+                        </button>
+                        <button onClick={() => setEditandoPlan(null)}
+                          className="flex-1 py-2 rounded-xl bg-[#2A2A2E] text-white text-sm font-medium">
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-[#18181B] border border-[#2A2A2E] rounded-2xl p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <p className="text-white font-medium">{p.nombre}</p>
+                          <p className="text-[#A0A0A8] text-xs">{p.descripcion}</p>
+                        </div>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          p.activo ? "bg-green-900 text-green-400" : "bg-red-900 text-red-400"
+                        }`}>
+                          {p.activo ? "Activo" : "Inactivo"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center mb-3">
+                        <div>
+                          <p className="text-white text-sm font-medium">${p.precio.toLocaleString("es-AR")}</p>
+                          <p className="text-[#A0A0A8] text-xs">{Math.floor(p.duracionMinutos / 60)}h</p>
+                        </div>
+                        {p.descuento > 0 && (
+                          <span className="bg-[#6E3FA3] text-white text-xs px-2 py-0.5 rounded-full">
+                            -{p.descuento}%
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => {
+                          setEditandoPlan(p);
+                          setNuevoNombre("");
+                          setNuevoDescripcion("");
+                          setNuevoPrecio("");
+                          setNuevaDuracion("");
+                          setNuevoDescuento("");
+                        }}
+                          className="flex-1 py-2 rounded-xl bg-[#6E3FA3] text-white text-sm font-medium">
+                          Editar
+                        </button>
+                        <button onClick={() => eliminarPlan(p.id)}
+                          className="flex-1 py-2 rounded-xl bg-red-900 text-white text-sm font-medium">
+                          Eliminar
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
               ))}
