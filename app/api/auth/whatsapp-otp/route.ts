@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
+const OTP_MAX_REQUESTS = 3;   // intentos máximos por ventana
+const OTP_WINDOW_SECS = 600;  // 10 minutos
+
 export async function POST(req: NextRequest) {
   const { action, codigo } = await req.json();
 
@@ -8,6 +11,18 @@ export async function POST(req: NextRequest) {
     url: process.env.UPSTASH_REDIS_REST_URL ?? "",
     token: process.env.UPSTASH_REDIS_REST_TOKEN ?? "",
   });
+
+  // Rate limiting por IP para ambas acciones
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const rateKey = `rate:otp:${ip}`;
+  const count = await redis.incr(rateKey);
+  if (count === 1) await redis.expire(rateKey, OTP_WINDOW_SECS);
+  if (count > OTP_MAX_REQUESTS) {
+    return NextResponse.json(
+      { error: "Demasiados intentos. Esperá 10 minutos e intentá de nuevo." },
+      { status: 429 }
+    );
+  }
 
   if (action === "solicitar") {
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
