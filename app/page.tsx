@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { PLANES } from "@/lib/planes";
+import { PLANES_PREDETERMINADOS, Plan } from "@/lib/planes";
 
 export default function PaginaPortal() {
   return (
@@ -14,7 +14,8 @@ export default function PaginaPortal() {
 
 function ContenidoPortal() {
   const parametros = useSearchParams();
-  const [planSeleccionado, setPlanSeleccionado] = useState(PLANES[1].id);
+  const [planes, setPlanes] = useState<Plan[]>(PLANES_PREDETERMINADOS);
+  const [planSeleccionado, setPlanSeleccionado] = useState(PLANES_PREDETERMINADOS[1].id);
   const [cargando, setCargando] = useState<"mp" | "nave" | "whatsapp" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [verificando, setVerificando] = useState(true);
@@ -42,6 +43,19 @@ function ContenidoPortal() {
       window.localStorage.setItem(clave, mac);
     }
     setMacDePrueba(mac);
+
+    // Carga paquetes desde Redis
+    fetch("/api/admin-planes")
+      .then((r) => r.json())
+      .then((datos: Plan[]) => {
+        if (Array.isArray(datos) && datos.length > 0) {
+          const activos = datos.filter((p) => p.activo);
+          setPlanes(activos.length > 0 ? activos : datos);
+          const inicial = activos[1] ?? activos[0] ?? datos[0];
+          if (inicial) setPlanSeleccionado(inicial.id);
+        }
+      })
+      .catch(() => {});
 
     // Carga configuración de medios de pago
     fetch("/api/config-publica")
@@ -181,7 +195,7 @@ function ContenidoPortal() {
       });
       if (!respuesta.ok) throw new Error("Error al iniciar el pago");
       const datos = await respuesta.json();
-      const planActual = PLANES.find((p) => p.id === planSeleccionado) ?? PLANES[1];
+      const planActual = planes.find((p) => p.id === planSeleccionado) ?? planes[1] ?? planes[0];
       const mensaje = `🛜 Mi link de pago WAIFAI\n${planActual.nombre} - $${planActual.precio.toLocaleString("es-AR")}\n\n${datos.urlPago}`;
       const waUrl = `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
 
@@ -272,7 +286,7 @@ function ContenidoPortal() {
         </p>
 
         <div className="flex flex-col gap-2.5">
-          {PLANES.map((plan) => (
+          {planes.map((plan) => (
             <button
               key={plan.id}
               onClick={() => setPlanSeleccionado(plan.id)}
