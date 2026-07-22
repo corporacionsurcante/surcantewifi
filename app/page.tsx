@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { PLANES_PREDETERMINADOS, Plan } from "@/lib/planes";
 
 export default function PaginaPortal() {
@@ -14,6 +14,7 @@ export default function PaginaPortal() {
 
 function ContenidoPortal() {
   const parametros = useSearchParams();
+  const router = useRouter();
   const [planes, setPlanes] = useState<Plan[]>(PLANES_PREDETERMINADOS);
   const [planSeleccionado, setPlanSeleccionado] = useState(PLANES_PREDETERMINADOS[1].id);
   const [cargando, setCargando] = useState<"mp" | "nave" | "whatsapp" | null>(null);
@@ -141,7 +142,12 @@ function ContenidoPortal() {
     try { window.location.href = url; } catch (e) { console.error('[abrirUrlConEstrategias] final fallback failed', e); }
   }
 
-  // --- Pago (navegar misma pestaña al link de pago para evitar about:blank) ---
+  // --- Pago con Mercado Pago ---
+  // Genera la preferencia de pago y navega a la página /pagar que
+  // detecta si el usuario está en un CNA (captive portal mini-browser)
+  // o en un navegador real, y muestra las instrucciones adecuadas.
+  // NOTA: iOS CNA y Android CPMB no pueden abrir apps directamente —
+  // la página /pagar ofrece WhatsApp share y copy-link como alternativas.
   async function pagar(medio: "mp" | "nave") {
     setError(null);
     setCargando(medio);
@@ -166,8 +172,25 @@ function ContenidoPortal() {
       const urlPago = datos.urlPago;
       if (!urlPago) throw new Error("No se recibió urlPago");
 
-      // Direct navigation to the payment URL in the same tab (avoids about:blank)
-      window.location.href = urlPago;
+      const planActual = planes.find((p) => p.id === planSeleccionado) ?? planes[0];
+      const precioFinal = planActual
+        ? planActual.descuento > 0
+          ? Math.round(planActual.precio * (1 - planActual.descuento / 100))
+          : planActual.precio
+        : 0;
+
+      if (medio === "nave") {
+        // Nave redirige correctamente a apps de pago — navegación directa
+        window.location.href = urlPago;
+      } else {
+        // Mercado Pago: usar la página /pagar que maneja CNA detection
+        const params = new URLSearchParams({
+          url: urlPago,
+          plan: planActual?.nombre ?? "WiFi Surcante",
+          precio: String(precioFinal),
+        });
+        router.push(`/pagar?${params.toString()}`);
+      }
     } catch (e) {
       console.error("[pagar] error:", e);
       setError("Hubo un problema al iniciar el pago. Probá de nuevo.");
