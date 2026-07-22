@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { buscarPlan } from "@/lib/planes";
+import { obtenerPlanesDesdeRedis, buscarPlan } from "@/lib/planes";
 import { guardarPagoPendiente } from "@/lib/pagos";
 
 // ──────────────────────────────────────────────────────────────
@@ -47,10 +47,15 @@ export async function POST(solicitud: NextRequest) {
   const cuerpo = await solicitud.json();
   const { planId, clientMac, apMac, redirectUrl, ssidName, site } = cuerpo;
 
-  const plan = buscarPlan(planId);
+  const planes = await obtenerPlanesDesdeRedis();
+  const plan = buscarPlan(planId, planes);
   if (!plan) {
     return NextResponse.json({ error: "Plan inválido" }, { status: 400 });
   }
+
+  const precioFinal = plan.descuento > 0
+    ? Math.round(plan.precio * (1 - plan.descuento / 100))
+    : plan.precio;
 
   const referenciaExterna = `surcante-${Date.now()}-${Math.random()
     .toString(36)
@@ -76,7 +81,7 @@ export async function POST(solicitud: NextRequest) {
             {
               amount: {
                 currency: "ARS",
-                value: plan.precio.toFixed(2),
+                value: precioFinal.toFixed(2),
               },
               products: [
                 {
@@ -85,7 +90,7 @@ export async function POST(solicitud: NextRequest) {
                   quantity: 1,
                   unit_price: {
                     currency: "ARS",
-                    value: plan.precio.toFixed(2),
+                    value: precioFinal.toFixed(2),
                   },
                 },
               ],

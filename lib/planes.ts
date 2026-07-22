@@ -91,3 +91,17 @@ export function obtenerPlanesActivos(planes?: Plan[]): Plan[] {
   const listaPlan = planes || PLANES;
   return listaPlan.filter((plan) => plan.activo);
 }
+
+// Obtiene los planes actuales desde Redis (usa defaults si Redis no está disponible)
+export async function obtenerPlanesDesdeRedis(): Promise<Plan[]> {
+  try {
+    const { Redis } = await import("@upstash/redis");
+    const redis = Redis.fromEnv();
+    const datos = await redis.get<string>("planes:lista");
+    if (!datos) return PLANES_PREDETERMINADOS;
+    const planes = typeof datos === "string" ? JSON.parse(datos) : datos;
+    return Array.isArray(planes) && planes.length > 0 ? planes : PLANES_PREDETERMINADOS;
+  } catch {
+    return PLANES_PREDETERMINADOS;
+  }
+}
