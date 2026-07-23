@@ -17,6 +17,17 @@ export async function POST(solicitud: NextRequest) {
     );
   }
 
+  if (!site) {
+    return NextResponse.json(
+      {
+        exito: false,
+        motivo:
+          "Omada no envio el parametro site. Revisa la configuracion de External Portal Server.",
+      },
+      { status: 400 }
+    );
+  }
+
   const resultadoOmada = await autorizarClienteEnOmada({
     clientMac,
     apMac: apMac ?? "",
