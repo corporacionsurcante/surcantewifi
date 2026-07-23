@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { PLANES_PREDETERMINADOS, Plan } from "@/lib/planes";
 
 export default function PaginaPortal() {
@@ -14,7 +14,6 @@ export default function PaginaPortal() {
 
 function ContenidoPortal() {
   const parametros = useSearchParams();
-  const router = useRouter();
   const [planes, setPlanes] = useState<Plan[]>(PLANES_PREDETERMINADOS);
   const [planSeleccionado, setPlanSeleccionado] = useState(PLANES_PREDETERMINADOS[1].id);
   const [cargando, setCargando] = useState<"mp" | "nave" | "whatsapp" | null>(null);
@@ -116,28 +115,24 @@ function ContenidoPortal() {
     return /iPad|iPhone|iPod/.test(navigator.userAgent) && !("MSStream" in window);
   }
 
-  // Simple helper to try to open a URL via app intent or scheme in the same tab
+  // Intenta abrir la app de Mercado Pago primero y si falla, usa el enlace web.
   function abrirUrlConEstrategias(url: string) {
-    console.log("[abrirUrlConEstrategias] navegando misma pestaña a intermedio para:", url, "isAndroid:", isAndroid(), "isiOS:", isiOS());
+    console.log("[abrirUrlConEstrategias] url:", url, "android:", isAndroid(), "ios:", isiOS());
 
-    // If non-mobile, just go directly
     if (!isAndroid() && !isiOS()) {
       try { window.location.href = url; return; } catch (e) { console.error(e); }
     }
 
-    // Build attempt URL
     let attemptUrl = url;
     if (isAndroid()) {
       const withoutScheme = url.replace(/^https?:\/\//, "");
-      attemptUrl = `intent://${withoutScheme}#Intent;scheme=https;package=com.mercadolibre.android;S.browser_fallback_url=${encodeURIComponent(url)};end`;
+      attemptUrl = `intent://${withoutScheme}#Intent;scheme=https;package=com.mercadopago.wallet;S.browser_fallback_url=${encodeURIComponent(url)};end`;
     } else if (isiOS()) {
       attemptUrl = `mercadopago://payment?url=${encodeURIComponent(url)}`;
     }
 
-    // Try to navigate to the attempt directly (top-level)
     try {
       window.location.href = attemptUrl;
-      // After short delay, if still at attemptUrl, navigate to fallback
       setTimeout(() => {
         try { if (window.location.href === attemptUrl) window.location.href = url; } catch(e){}
       }, 1200);
@@ -146,7 +141,6 @@ function ContenidoPortal() {
       console.warn('[abrirUrlConEstrategias] direct attempt failed', e);
     }
 
-    // Final fallback
     try { window.location.href = url; } catch (e) { console.error('[abrirUrlConEstrategias] final fallback failed', e); }
   }
 
@@ -180,24 +174,12 @@ function ContenidoPortal() {
       const urlPago = datos.urlPago;
       if (!urlPago) throw new Error("No se recibió urlPago");
 
-      const planActual = planes.find((p) => p.id === planSeleccionado) ?? planes[0];
-      const precioFinal = planActual
-        ? planActual.descuento > 0
-          ? Math.round(planActual.precio * (1 - planActual.descuento / 100))
-          : planActual.precio
-        : 0;
-
       if (medio === "nave") {
         // Nave redirige correctamente a apps de pago — navegación directa
         window.location.href = urlPago;
       } else {
-        // Mercado Pago: usar la página /pagar que maneja CNA detection
-        const params = new URLSearchParams({
-          url: urlPago,
-          plan: planActual?.nombre ?? "WiFi Surcante",
-          precio: String(precioFinal),
-        });
-        router.push(`/pagar?${params.toString()}`);
+        // Mercado Pago: siempre intentar app primero (sin pantalla intermedia).
+        abrirUrlConEstrategias(urlPago);
       }
 
     } catch (e) {
