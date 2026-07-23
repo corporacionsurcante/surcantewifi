@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { signIn, signOut, useSession } from "next-auth/react";
 
 type ResumenData = {
   totalPagos: number;
@@ -62,9 +61,6 @@ type PlanData = {
 };
 
 export default function PanelAdmin() {
-  const { data: session, status } = useSession();
-  const googleAutenticado = status === "authenticated" && !!session?.user?.email;
-
   const [clave, setClave] = useState("");
   const [autenticado, setAutenticado] = useState(false);
   const [claveIngresada, setClaveIngresada] = useState("");
@@ -279,30 +275,6 @@ export default function PanelAdmin() {
     }
   }
 
-  // Cuando Google auth está activo, obtener el token de admin automáticamente
-  useEffect(() => {
-    if (googleAutenticado && !autenticado) {
-      fetch("/api/admin-token")
-        .then((r) => r.json())
-        .then(async (d) => {
-          if (d.token) {
-            setClave(d.token);
-            const r = await fetch("/api/admin-dashboard", { headers: { "x-admin-key": d.token } });
-            if (r.ok) {
-              const data = await r.json();
-              setAutenticado(true);
-              setResumen(data.resumen);
-              setPagos(data.pagos);
-              setCodigos(data.codigos);
-              cargarConfig();
-              cargarPaquetes(d.token);
-            }
-          }
-        })
-        .catch(console.error);
-    }
-  }, [googleAutenticado, autenticado, cargarPaquetes]);
-
   useEffect(() => {
     if (autenticado && clave) {
       const i = setInterval(() => cargarDatos(clave), 30000);
@@ -328,14 +300,6 @@ export default function PanelAdmin() {
   const formatFecha = (ts: number) => new Date(ts).toLocaleString("es-AR", {
     day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit",
   });
-
-  if (status === "loading") {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-[#0A0A0C]">
-        <div className="w-8 h-8 rounded-full bg-[#6E3FA3] animate-pulse" />
-      </main>
-    );
-  }
 
   if (!autenticado) {
     return (
@@ -429,14 +393,6 @@ export default function PanelAdmin() {
           </div>
           <button onClick={() => { cargarDatos(clave); if (tab === "dispositivos") cargarDispositivos(clave); }}
             className="text-[#8B5FBF] text-sm underline">Actualizar</button>
-          {googleAutenticado && (
-            <button
-              onClick={() => { signOut({ callbackUrl: "/admin" }); setAutenticado(false); setClave(""); }}
-              className="text-[#5A5A60] text-xs underline ml-2"
-            >
-              Salir
-            </button>
-          )}
         </div>
 
         <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
