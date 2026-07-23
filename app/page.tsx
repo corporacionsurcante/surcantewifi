@@ -24,6 +24,12 @@ function ContenidoPortal() {
   const [mostrarConfirmMinutoLibre, setMostrarConfirmMinutoLibre] = useState(false);
   const [activandoMinutoLibre, setActivandoMinutoLibre] = useState(false);
   const [esCNA, setEsCNA] = useState(false);
+  const [pagoPendiente, setPagoPendiente] = useState<{
+    preferenciaId: string;
+    planId: string;
+    urlPago: string;
+  } | null>(null);
+  const [consultandoPago, setConsultandoPago] = useState(false);
 
   const [mostrarCodigo, setMostrarCodigo] = useState(false);
   const [codigo, setCodigo] = useState("");
@@ -117,6 +123,56 @@ function ContenidoPortal() {
     setEsCNA(iosCna || androidCpmb);
   }, []);
 
+  useEffect(() => {
+    if (!pagoPendiente?.preferenciaId) return;
+    let cancelado = false;
+    setConsultandoPago(true);
+
+    const intervalo = setInterval(async () => {
+      try {
+        const r = await fetch(
+          `/api/pago-estado?preferenciaId=${encodeURIComponent(
+            pagoPendiente.preferenciaId
+          )}`
+        );
+        const d = await r.json();
+        if (cancelado) return;
+        if (d?.confirmado) {
+          setConsultandoPago(false);
+          setPagoPendiente(null);
+          window.location.href = `/pagado?plan=${encodeURIComponent(
+            d.planId ?? pagoPendiente.planId
+          )}`;
+        }
+      } catch {
+        // noop
+      }
+    }, 3500);
+
+    return () => {
+      cancelado = true;
+      clearInterval(intervalo);
+      setConsultandoPago(false);
+    };
+  }, [pagoPendiente]);
+
+  function abrirPagoEnNavegadorExterno(url: string) {
+    if (esCNA) {
+      const enlace = document.createElement("a");
+      enlace.href = url;
+      enlace.target = "_blank";
+      enlace.rel = "noopener noreferrer";
+      document.body.appendChild(enlace);
+      enlace.click();
+      document.body.removeChild(enlace);
+      setTimeout(() => {
+        window.location.href = url;
+      }, 900);
+      return;
+    }
+    window.location.href = url;
+  }
+
   // --- Pago con Mercado Pago ---
   // Genera preferencia y navega directo al link de Mercado Pago.
   // Ese link (mobile_init_point) permite que iOS/Android abran la app
@@ -144,27 +200,15 @@ function ContenidoPortal() {
 
       const urlPago = datos.urlPago;
       if (!urlPago) throw new Error("No se recibió urlPago");
-
-      if (medio === "mp" && esCNA) {
-        const enlace = document.createElement("a");
-        enlace.href = urlPago;
-        enlace.target = "_blank";
-        enlace.rel = "noopener noreferrer";
-        document.body.appendChild(enlace);
-        enlace.click();
-        document.body.removeChild(enlace);
-
-        setTimeout(() => {
-          window.location.href = urlPago;
-        }, 900);
-      } else {
-        window.location.href = urlPago;
+      if (medio === "mp") {
+        setPagoPendiente({
+          preferenciaId: datos.preferenciaId,
+          planId: planSeleccionado,
+          urlPago,
+        });
       }
-
-      setTimeout(() => {
-        setCargando(null);
-        setError("No se pudo abrir la app automáticamente. Probá una vez más.");
-      }, 2500);
+      abrirPagoEnNavegadorExterno(urlPago);
+      setCargando(null);
 
     } catch (e) {
       console.error("[pagar] error:", e);
@@ -353,6 +397,27 @@ function ContenidoPortal() {
 
         {error && (
           <p className="text-sm text-red-400 mt-4 text-center">{error}</p>
+        )}
+
+        {pagoPendiente && (
+          <div className="bg-[#18181B] border border-[#2A2A2E] rounded-xl px-4 py-4 mt-4">
+            <p className="text-white text-sm font-medium mb-1">
+              Pago iniciado
+            </p>
+            <p className="text-[#A0A0A8] text-[12px] leading-relaxed mb-3">
+              Completá el pago fuera del navegador cautivo. Este portal detecta
+              automáticamente cuando Mercado Pago lo confirma.
+            </p>
+            <button
+              onClick={() => abrirPagoEnNavegadorExterno(pagoPendiente.urlPago)}
+              className="w-full py-2.5 rounded-lg text-[13px] font-medium bg-[#009EE3] text-white mb-2"
+            >
+              Abrir pago nuevamente
+            </button>
+            <p className="text-[11px] text-[#5A5A60] text-center">
+              Estado: {consultandoPago ? "esperando confirmación..." : "iniciando..."}
+            </p>
+          </div>
         )}
 
         <p className="text-xs text-[#A0A0A8] text-center mt-5 mb-3">Elegí cómo pagar</p>
