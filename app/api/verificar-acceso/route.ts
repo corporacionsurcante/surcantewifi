@@ -3,6 +3,7 @@ import { Redis } from "@upstash/redis";
 import { autorizarClienteEnOmada } from "@/lib/omada";
 
 const redis = Redis.fromEnv();
+const CLAVE_FLUJO_MP = "mp:flujo:";
 
 // Verifica si una MAC ya tiene acceso activo (pago o código)
 // y si es así la reautoriza en Omada automáticamente.
@@ -22,7 +23,17 @@ export async function POST(solicitud: NextRequest) {
     const datos = await redis.get<string>(macKey);
 
     if (!datos) {
-      return NextResponse.json({ tieneAcceso: false });
+      const flujoMp = await redis.get<string>(`${CLAVE_FLUJO_MP}${clientMac}`);
+      if (!flujoMp) {
+        return NextResponse.json({ tieneAcceso: false });
+      }
+
+      const flujo = typeof flujoMp === "string" ? JSON.parse(flujoMp) : flujoMp;
+      return NextResponse.json({
+        tieneAcceso: false,
+        continuarPagoMp: true,
+        planIdPendiente: flujo.planId ?? null,
+      });
     }
 
     const registro = typeof datos === "string" ? JSON.parse(datos) : datos;

@@ -21,6 +21,9 @@ function ContenidoPortal() {
   const [error, setError] = useState<string | null>(null);
   const [verificando, setVerificando] = useState(true);
   const [accesoAutomatico, setAccesoAutomatico] = useState(false);
+  const [mpListoParaPagoDirecto, setMpListoParaPagoDirecto] = useState(false);
+  const [mostrarConfirmMinutoLibre, setMostrarConfirmMinutoLibre] = useState(false);
+  const [activandoMinutoLibre, setActivandoMinutoLibre] = useState(false);
 
   const [mostrarCodigo, setMostrarCodigo] = useState(false);
   const [codigo, setCodigo] = useState("");
@@ -93,6 +96,11 @@ function ContenidoPortal() {
             setTimeout(() => {
               window.location.href = redirect;
             }, 2000);
+          }
+        } else if (datos.continuarPagoMp) {
+          setMpListoParaPagoDirecto(true);
+          if (datos.planIdPendiente) {
+            setPlanSeleccionado(datos.planIdPendiente);
           }
         }
       })
@@ -191,11 +199,58 @@ function ContenidoPortal() {
         });
         router.push(`/pagar?${params.toString()}`);
       }
+
     } catch (e) {
       console.error("[pagar] error:", e);
       setError("Hubo un problema al iniciar el pago. Probá de nuevo.");
       setCargando(null);
     }
+  }
+
+  async function activarMinutoLibreYSalir() {
+    setError(null);
+    setActivandoMinutoLibre(true);
+    setCargando("mp");
+
+    try {
+      const respuesta = await fetch("/api/minuto-libre", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          planId: planSeleccionado,
+          clientMac: macCliente,
+          apMac: macAp,
+          ssidName: nombreSsid,
+          site: nombreSitio,
+        }),
+      });
+
+      const datos = await respuesta.json();
+      if (!respuesta.ok || !datos.exito) {
+        throw new Error(datos.motivo ?? "No se pudo activar el minuto libre");
+      }
+
+      const destino =
+        urlRedireccion ||
+        "https://www.apple.com/library/test/success.html";
+      window.location.href = destino;
+    } catch (e) {
+      console.error("[minuto-libre] error:", e);
+      setError(
+        "No pudimos activar el minuto libre. Probá de nuevo o elegí otro medio de pago."
+      );
+      setActivandoMinutoLibre(false);
+      setCargando(null);
+      setMostrarConfirmMinutoLibre(false);
+    }
+  }
+
+  function iniciarFlujoMercadoPago() {
+    if (!macCliente || macCliente.startsWith("PRUEBA-") || mpListoParaPagoDirecto) {
+      pagar("mp");
+      return;
+    }
+    setMostrarConfirmMinutoLibre(true);
   }
 
   // --- Pago por WhatsApp (navegar misma pestaña al link de WA) ---
@@ -336,6 +391,46 @@ function ContenidoPortal() {
 
         <p className="text-xs text-[#A0A0A8] text-center mt-5 mb-3">Elegí cómo pagar</p>
 
+        {mpListoParaPagoDirecto && (
+          <div className="bg-[#0d1f14] border border-[#25D366] rounded-xl px-4 py-3 mb-3">
+            <p className="text-[#25D366] text-[12px] font-medium mb-1">
+              Minuto libre finalizado
+            </p>
+            <p className="text-[#A0A0A8] text-[12px] leading-relaxed">
+              Ya podés continuar con Mercado Pago desde el navegador normal del celular.
+            </p>
+          </div>
+        )}
+
+        {mostrarConfirmMinutoLibre && !mpListoParaPagoDirecto && (
+          <div className="bg-[#18181B] border border-[#2A2A2E] rounded-xl px-4 py-4 mb-3">
+            <p className="text-white text-sm font-medium mb-1">
+              1 minuto libre para salir del navegador cautivo
+            </p>
+            <p className="text-[#A0A0A8] text-[12px] leading-relaxed mb-3">
+              Te habilitamos 1 minuto de internet para que el sistema salga del navegador
+              interno. Cuando termine, volvés al portal y pagás con Mercado Pago desde
+              el navegador normal.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setMostrarConfirmMinutoLibre(false)}
+                disabled={activandoMinutoLibre}
+                className="flex-1 py-2.5 rounded-lg text-[13px] font-medium bg-[#2A2A2E] text-white disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={activarMinutoLibreYSalir}
+                disabled={activandoMinutoLibre}
+                className="flex-1 py-2.5 rounded-lg text-[13px] font-medium bg-[#6E3FA3] text-white disabled:opacity-60"
+              >
+                {activandoMinutoLibre ? "Activando..." : "Aceptar"}
+              </button>
+            </div>
+          </div>
+        )}
+
         {config.nave && (
           <button
             onClick={() => pagar("nave")}
@@ -348,11 +443,15 @@ function ContenidoPortal() {
 
         {config.mp && (
           <button
-            onClick={() => pagar("mp")}
+            onClick={iniciarFlujoMercadoPago}
             disabled={ocupado}
             className="w-full py-3.5 rounded-xl text-[15px] font-medium bg-[#18181B] border border-[#2A2A2E] hover:bg-[#211A2B] active:scale-[0.98] transition disabled:opacity-60 mb-2.5"
           >
-            {cargando === "mp" ? "Abriendo pago..." : "Pagar con Mercado Pago"}
+            {cargando === "mp"
+              ? "Abriendo pago..."
+              : mpListoParaPagoDirecto
+              ? "Continuar pago con Mercado Pago"
+              : "Pagar con Mercado Pago"}
           </button>
         )}
 
