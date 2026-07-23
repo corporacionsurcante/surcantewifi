@@ -228,9 +228,9 @@ function ContenidoPortal() {
     setError(null);
     setActivandoConexionTemporal(true);
 
-    if (!parametros.get("clientMac") || !nombreSitio) {
+    if (!parametros.get("clientMac")) {
       setError(
-        "Omada no esta enviando los datos del portal (clientMac/site). Revisa External Portal Server y la redireccion."
+        "Omada no esta enviando clientMac. Revisa External Portal Server y la redireccion."
       );
       setActivandoConexionTemporal(false);
       setMostrarConfirmConexionTemporal(false);
