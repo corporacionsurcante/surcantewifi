@@ -31,6 +31,7 @@ export async function POST(solicitud: NextRequest) {
       const flujo = typeof flujoMp === "string" ? JSON.parse(flujoMp) : flujoMp;
       return NextResponse.json({
         tieneAcceso: false,
+        conexionTemporalActiva: true,
         continuarPagoMp: true,
         planIdPendiente: flujo.planId ?? null,
       });

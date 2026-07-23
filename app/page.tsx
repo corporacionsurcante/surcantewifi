@@ -20,10 +20,11 @@ function ContenidoPortal() {
   const [error, setError] = useState<string | null>(null);
   const [verificando, setVerificando] = useState(true);
   const [accesoAutomatico, setAccesoAutomatico] = useState(false);
-  const [mpListoParaPagoDirecto, setMpListoParaPagoDirecto] = useState(false);
-  const [mostrarConfirmMinutoLibre, setMostrarConfirmMinutoLibre] = useState(false);
-  const [activandoMinutoLibre, setActivandoMinutoLibre] = useState(false);
+  const [conexionTemporalActiva, setConexionTemporalActiva] = useState(false);
+  const [mostrarConfirmConexionTemporal, setMostrarConfirmConexionTemporal] = useState(false);
+  const [activandoConexionTemporal, setActivandoConexionTemporal] = useState(false);
   const [esCNA, setEsCNA] = useState(false);
+  const [portalPublicoUrl, setPortalPublicoUrl] = useState("https://surcantewifi.vercel.app");
   const [pagoPendiente, setPagoPendiente] = useState<{
     preferenciaId: string;
     planId: string;
@@ -103,8 +104,8 @@ function ContenidoPortal() {
               window.location.href = redirect;
             }, 2000);
           }
-        } else if (datos.continuarPagoMp) {
-          setMpListoParaPagoDirecto(true);
+        } else if (datos.conexionTemporalActiva || datos.continuarPagoMp) {
+          setConexionTemporalActiva(true);
           if (datos.planIdPendiente) {
             setPlanSeleccionado(datos.planIdPendiente);
           }
@@ -217,10 +218,9 @@ function ContenidoPortal() {
     }
   }
 
-  async function activarMinutoLibreYSalir() {
+  async function activarConexionTemporal() {
     setError(null);
-    setActivandoMinutoLibre(true);
-    setCargando("mp");
+    setActivandoConexionTemporal(true);
 
     try {
       const respuesta = await fetch("/api/minuto-libre", {
@@ -237,30 +237,32 @@ function ContenidoPortal() {
 
       const datos = await respuesta.json();
       if (!respuesta.ok || !datos.exito) {
-        throw new Error(datos.motivo ?? "No se pudo activar el minuto libre");
+        throw new Error(datos.motivo ?? "No se pudo activar la conexión temporal");
       }
-
-      const destino =
-        urlRedireccion ||
-        "https://www.apple.com/library/test/success.html";
-      window.location.href = destino;
+      setConexionTemporalActiva(true);
+      setPortalPublicoUrl(datos.portalUrl ?? window.location.origin);
+      setMostrarConfirmConexionTemporal(false);
+      setActivandoConexionTemporal(false);
     } catch (e) {
-      console.error("[minuto-libre] error:", e);
+      console.error("[conexion-temporal] error:", e);
       setError(
-        "No pudimos activar el minuto libre. Probá de nuevo o elegí otro medio de pago."
+        "No pudimos activar la conexión temporal. Probá de nuevo."
       );
-      setActivandoMinutoLibre(false);
-      setCargando(null);
-      setMostrarConfirmMinutoLibre(false);
+      setActivandoConexionTemporal(false);
+      setMostrarConfirmConexionTemporal(false);
     }
   }
 
   function iniciarFlujoMercadoPago() {
-    if (!macCliente || macCliente.startsWith("PRUEBA-") || mpListoParaPagoDirecto) {
+    if (esCNA && !conexionTemporalActiva) {
+      setMostrarConfirmConexionTemporal(true);
+      return;
+    }
+    if (!macCliente || macCliente.startsWith("PRUEBA-")) {
       pagar("mp");
       return;
     }
-    setMostrarConfirmMinutoLibre(true);
+    pagar("mp");
   }
 
   // --- Pago por WhatsApp (navegar misma pestaña al link de WA) ---
@@ -420,80 +422,97 @@ function ContenidoPortal() {
           </div>
         )}
 
-        <p className="text-xs text-[#A0A0A8] text-center mt-5 mb-3">Elegí cómo pagar</p>
-
-        {mpListoParaPagoDirecto && (
-          <div className="bg-[#0d1f14] border border-[#25D366] rounded-xl px-4 py-3 mb-3">
-            <p className="text-[#25D366] text-[12px] font-medium mb-1">
-              Minuto libre finalizado
-            </p>
-            <p className="text-[#A0A0A8] text-[12px] leading-relaxed">
-              Ya podés continuar con Mercado Pago desde el navegador normal del celular.
-            </p>
+        {esCNA && !conexionTemporalActiva ? (
+          <div className="mt-5">
+            <p className="text-xs text-[#A0A0A8] text-center mb-3">Paso 1 · Conectarte</p>
+            <div className="bg-[#18181B] border border-[#2A2A2E] rounded-xl px-4 py-4 mb-3">
+              <p className="text-white text-sm font-medium mb-1">
+                Conectate primero (3 minutos gratis)
+              </p>
+              <p className="text-[#A0A0A8] text-[12px] leading-relaxed mb-3">
+                Este navegador cautivo no procesa bien Mercado Pago App. Activá conexión
+                temporal, abrí Safari/Chrome y entrá a {portalPublicoUrl.replace(/^https?:\/\//, "")}
+                para pagar tu pack.
+              </p>
+              {mostrarConfirmConexionTemporal ? (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setMostrarConfirmConexionTemporal(false)}
+                    disabled={activandoConexionTemporal}
+                    className="flex-1 py-2.5 rounded-lg text-[13px] font-medium bg-[#2A2A2E] text-white disabled:opacity-60"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={activarConexionTemporal}
+                    disabled={activandoConexionTemporal}
+                    className="flex-1 py-2.5 rounded-lg text-[13px] font-medium bg-[#6E3FA3] text-white disabled:opacity-60"
+                  >
+                    {activandoConexionTemporal ? "Conectando..." : "Conectarme"}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setMostrarConfirmConexionTemporal(true)}
+                  className="w-full py-3 rounded-xl text-[14px] font-medium bg-[#6E3FA3] text-white"
+                >
+                  Conectarme
+                </button>
+              )}
+            </div>
           </div>
-        )}
-
-        {mostrarConfirmMinutoLibre && !mpListoParaPagoDirecto && (
-          <div className="bg-[#18181B] border border-[#2A2A2E] rounded-xl px-4 py-4 mb-3">
-            <p className="text-white text-sm font-medium mb-1">
-              1 minuto libre para salir del navegador cautivo
-            </p>
-            <p className="text-[#A0A0A8] text-[12px] leading-relaxed mb-3">
-              Te habilitamos 1 minuto de internet para que el sistema salga del navegador
-              interno. Cuando termine, volvés al portal y pagás con Mercado Pago desde
-              el navegador normal.
-            </p>
-            <div className="flex gap-2">
+        ) : esCNA && conexionTemporalActiva ? (
+          <div className="mt-5">
+            <p className="text-xs text-[#A0A0A8] text-center mb-3">Paso 2 · Abrí navegador normal</p>
+            <div className="bg-[#0d1f14] border border-[#25D366] rounded-xl px-4 py-4 mb-3">
+              <p className="text-[#25D366] text-[12px] font-medium mb-1">
+                Conexión temporal activa
+              </p>
+              <p className="text-[#A0A0A8] text-[12px] leading-relaxed mb-3">
+                Abrí Safari/Chrome y entrá a {portalPublicoUrl.replace(/^https?:\/\//, "")}.
+                Ahí vas a pagar el pack y te habilitamos internet al confirmar el pago.
+              </p>
               <button
-                onClick={() => setMostrarConfirmMinutoLibre(false)}
-                disabled={activandoMinutoLibre}
-                className="flex-1 py-2.5 rounded-lg text-[13px] font-medium bg-[#2A2A2E] text-white disabled:opacity-60"
+                onClick={() => abrirPagoEnNavegadorExterno(portalPublicoUrl)}
+                className="w-full py-3 rounded-xl text-[14px] font-medium bg-[#009EE3] text-white"
               >
-                Cancelar
-              </button>
-              <button
-                onClick={activarMinutoLibreYSalir}
-                disabled={activandoMinutoLibre}
-                className="flex-1 py-2.5 rounded-lg text-[13px] font-medium bg-[#6E3FA3] text-white disabled:opacity-60"
-              >
-                {activandoMinutoLibre ? "Activando..." : "Aceptar"}
+                Abrir portal en navegador
               </button>
             </div>
           </div>
-        )}
+        ) : (
+          <>
+            <p className="text-xs text-[#A0A0A8] text-center mt-5 mb-3">Elegí cómo pagar</p>
+            {config.nave && (
+              <button
+                onClick={() => pagar("nave")}
+                disabled={ocupado}
+                className="w-full py-3.5 rounded-xl text-[15px] font-medium bg-[#6E3FA3] hover:bg-[#5A3286] active:scale-[0.98] transition disabled:opacity-60 mb-2.5"
+              >
+                {cargando === "nave" ? "Abriendo pago..." : "Pagar con Nave / Galicia"}
+              </button>
+            )}
 
-        {config.nave && (
-          <button
-            onClick={() => pagar("nave")}
-            disabled={ocupado}
-            className="w-full py-3.5 rounded-xl text-[15px] font-medium bg-[#6E3FA3] hover:bg-[#5A3286] active:scale-[0.98] transition disabled:opacity-60 mb-2.5"
-          >
-            {cargando === "nave" ? "Abriendo pago..." : "Pagar con Nave / Galicia"}
-          </button>
-        )}
+            {config.mp && (
+              <button
+                onClick={iniciarFlujoMercadoPago}
+                disabled={ocupado}
+                className="w-full py-3.5 rounded-xl text-[15px] font-medium bg-[#18181B] border border-[#2A2A2E] hover:bg-[#211A2B] active:scale-[0.98] transition disabled:opacity-60 mb-2.5"
+              >
+                {cargando === "mp" ? "Abriendo pago..." : "Pagar con Mercado Pago"}
+              </button>
+            )}
 
-        {config.mp && (
-          <button
-            onClick={iniciarFlujoMercadoPago}
-            disabled={ocupado}
-            className="w-full py-3.5 rounded-xl text-[15px] font-medium bg-[#18181B] border border-[#2A2A2E] hover:bg-[#211A2B] active:scale-[0.98] transition disabled:opacity-60 mb-2.5"
-          >
-            {cargando === "mp"
-              ? "Abriendo pago..."
-              : mpListoParaPagoDirecto
-              ? "Continuar pago con Mercado Pago"
-              : "Pagar con Mercado Pago"}
-          </button>
-        )}
-
-        {config.whatsapp && (
-          <button
-            onClick={pagarPorWhatsApp}
-            disabled={ocupado}
-            className="w-full py-3.5 rounded-xl text-[15px] font-medium bg-[#18181B] border border-[#25D366] text-[#25D366] hover:bg-[#0d1f14] active:scale-[0.98] transition disabled:opacity-60"
-          >
-            {cargando === "whatsapp" ? "Generando link..." : "📲 Pagar por WhatsApp"}
-          </button>
+            {config.whatsapp && (
+              <button
+                onClick={pagarPorWhatsApp}
+                disabled={ocupado}
+                className="w-full py-3.5 rounded-xl text-[15px] font-medium bg-[#18181B] border border-[#25D366] text-[#25D366] hover:bg-[#0d1f14] active:scale-[0.98] transition disabled:opacity-60"
+              >
+                {cargando === "whatsapp" ? "Generando link..." : "📲 Pagar por WhatsApp"}
+              </button>
+            )}
+          </>
         )}
 
         <p className="text-[11px] text-[#5A5A60] text-center mt-4">
