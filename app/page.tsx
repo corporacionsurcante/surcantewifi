@@ -228,15 +228,6 @@ function ContenidoPortal() {
     setError(null);
     setActivandoConexionTemporal(true);
 
-    if (!parametros.get("clientMac")) {
-      setError(
-        "Omada no esta enviando clientMac. Revisa External Portal Server y la redireccion."
-      );
-      setActivandoConexionTemporal(false);
-      setMostrarConfirmConexionTemporal(false);
-      return;
-    }
-
     try {
       const respuesta = await fetch("/api/minuto-libre", {
         method: "POST",
@@ -437,7 +428,7 @@ function ContenidoPortal() {
           </div>
         )}
 
-        {esCNA && !conexionTemporalActiva ? (
+        {esCNA && !conexionTemporalActiva && !!parametros.get("clientMac") ? (
           <div className="mt-5">
             <p className="text-xs text-[#A0A0A8] text-center mb-3">Paso 1 · Conectarte</p>
             <div className="bg-[#18181B] border border-[#2A2A2E] rounded-xl px-4 py-4 mb-3">
@@ -474,6 +465,21 @@ function ContenidoPortal() {
                   Conectarme
                 </button>
               )}
+            </div>
+          </div>
+        ) : esCNA && !conexionTemporalActiva && !parametros.get("clientMac") ? (
+          <div className="mt-5">
+            <div className="bg-[#0d1322] border border-[#009EE3] rounded-xl px-4 py-4 mb-3">
+              <p className="text-[#009EE3] text-[13px] font-medium mb-2">
+                Ya estás conectado ✓
+              </p>
+              <p className="text-[#A0A0A8] text-[12px] leading-relaxed mb-4">
+                Para pagar, cerrá esta ventana y abrí <strong className="text-white">Safari</strong> o <strong className="text-white">Chrome</strong>.
+                Entrá a <strong className="text-white">waifai.app</strong> y elegí tu pack.
+              </p>
+              <div className="bg-[#18181B] rounded-lg px-3 py-2 text-center">
+                <p className="text-white text-[13px] font-mono">waifai.app</p>
+              </div>
             </div>
           </div>
         ) : esCNA && conexionTemporalActiva ? (
