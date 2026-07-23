@@ -24,7 +24,7 @@ function ContenidoPortal() {
   const [mostrarConfirmConexionTemporal, setMostrarConfirmConexionTemporal] = useState(false);
   const [activandoConexionTemporal, setActivandoConexionTemporal] = useState(false);
   const [esCNA, setEsCNA] = useState(false);
-  const [portalPublicoUrl, setPortalPublicoUrl] = useState("https://surcantewifi.vercel.app");
+  const [portalPublicoUrl, setPortalPublicoUrl] = useState("");
   const [pagoPendiente, setPagoPendiente] = useState<{
     preferenciaId: string;
     planId: string;
@@ -45,8 +45,14 @@ function ContenidoPortal() {
   const urlRedireccion = parametros.get("redirectUrl") ?? "";
   const nombreSsid = parametros.get("ssidName") ?? "";
   const nombreSitio = parametros.get("site") ?? "";
+  const portalPublicoHost = (portalPublicoUrl || "https://waifai.app").replace(
+    /^https?:\/\//,
+    ""
+  );
 
   useEffect(() => {
+    setPortalPublicoUrl(window.location.origin);
+
     const clave = "surcante-mac-prueba";
     let mac = window.localStorage.getItem(clave);
     if (!mac) {
@@ -222,6 +228,15 @@ function ContenidoPortal() {
     setError(null);
     setActivandoConexionTemporal(true);
 
+    if (!parametros.get("clientMac") || !nombreSitio) {
+      setError(
+        "Omada no esta enviando los datos del portal (clientMac/site). Revisa External Portal Server y la redireccion."
+      );
+      setActivandoConexionTemporal(false);
+      setMostrarConfirmConexionTemporal(false);
+      return;
+    }
+
     try {
       const respuesta = await fetch("/api/minuto-libre", {
         method: "POST",
@@ -245,9 +260,9 @@ function ContenidoPortal() {
       setActivandoConexionTemporal(false);
     } catch (e) {
       console.error("[conexion-temporal] error:", e);
-      setError(
-        "No pudimos activar la conexión temporal. Probá de nuevo."
-      );
+      const mensaje =
+        e instanceof Error ? e.message : "No pudimos activar la conexión temporal.";
+      setError(mensaje);
       setActivandoConexionTemporal(false);
       setMostrarConfirmConexionTemporal(false);
     }
@@ -431,7 +446,7 @@ function ContenidoPortal() {
               </p>
               <p className="text-[#A0A0A8] text-[12px] leading-relaxed mb-3">
                 Este navegador cautivo no procesa bien Mercado Pago App. Activá conexión
-                temporal, abrí Safari/Chrome y entrá a {portalPublicoUrl.replace(/^https?:\/\//, "")}
+                temporal, abrí Safari/Chrome y entrá a {portalPublicoHost}{" "}
                 para pagar tu pack.
               </p>
               {mostrarConfirmConexionTemporal ? (
@@ -469,7 +484,7 @@ function ContenidoPortal() {
                 Conexión temporal activa
               </p>
               <p className="text-[#A0A0A8] text-[12px] leading-relaxed mb-3">
-                Abrí Safari/Chrome y entrá a {portalPublicoUrl.replace(/^https?:\/\//, "")}.
+                Abrí Safari/Chrome y entrá a {portalPublicoHost}.
                 Ahí vas a pagar el pack y te habilitamos internet al confirmar el pago.
               </p>
               <button
