@@ -22,7 +22,7 @@ export async function POST(solicitud: NextRequest) {
       {
         exito: false,
         motivo:
-          "Omada no envio el parametro site. Revisá la configuración de External Portal Server.",
+          "Omada no envio el parametro site. Revisa la configuracion de External Portal Server.",
       },
       { status: 400 }
     );
