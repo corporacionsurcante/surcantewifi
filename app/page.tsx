@@ -107,49 +107,10 @@ function ContenidoPortal() {
       .finally(() => setVerificando(false));
   }, [macDePrueba, parametros]);
 
-  // --- Helpers de plataforma y apertura ---
-  function isAndroid() {
-    return /android/i.test(navigator.userAgent);
-  }
-  function isiOS() {
-    return /iPad|iPhone|iPod/.test(navigator.userAgent) && !("MSStream" in window);
-  }
-
-  // Intenta abrir la app de Mercado Pago primero y si falla, usa el enlace web.
-  function abrirUrlConEstrategias(url: string) {
-    console.log("[abrirUrlConEstrategias] url:", url, "android:", isAndroid(), "ios:", isiOS());
-
-    if (!isAndroid() && !isiOS()) {
-      try { window.location.href = url; return; } catch (e) { console.error(e); }
-    }
-
-    let attemptUrl = url;
-    if (isAndroid()) {
-      const withoutScheme = url.replace(/^https?:\/\//, "");
-      attemptUrl = `intent://${withoutScheme}#Intent;scheme=https;package=com.mercadopago.wallet;S.browser_fallback_url=${encodeURIComponent(url)};end`;
-    } else if (isiOS()) {
-      attemptUrl = `mercadopago://payment?url=${encodeURIComponent(url)}`;
-    }
-
-    try {
-      window.location.href = attemptUrl;
-      setTimeout(() => {
-        try { if (window.location.href === attemptUrl) window.location.href = url; } catch(e){}
-      }, 1200);
-      return;
-    } catch (e) {
-      console.warn('[abrirUrlConEstrategias] direct attempt failed', e);
-    }
-
-    try { window.location.href = url; } catch (e) { console.error('[abrirUrlConEstrategias] final fallback failed', e); }
-  }
-
   // --- Pago con Mercado Pago ---
-  // Genera la preferencia de pago y navega a la página /pagar que
-  // detecta si el usuario está en un CNA (captive portal mini-browser)
-  // o en un navegador real, y muestra las instrucciones adecuadas.
-  // NOTA: iOS CNA y Android CPMB no pueden abrir apps directamente —
-  // la página /pagar ofrece WhatsApp share y copy-link como alternativas.
+  // Genera preferencia y navega directo al link de Mercado Pago.
+  // Ese link (mobile_init_point) permite que iOS/Android abran la app
+  // cuando están fuera del navegador cautivo.
   async function pagar(medio: "mp" | "nave") {
     setError(null);
     setCargando(medio);
@@ -174,13 +135,11 @@ function ContenidoPortal() {
       const urlPago = datos.urlPago;
       if (!urlPago) throw new Error("No se recibió urlPago");
 
-      if (medio === "nave") {
-        // Nave redirige correctamente a apps de pago — navegación directa
-        window.location.href = urlPago;
-      } else {
-        // Mercado Pago: siempre intentar app primero (sin pantalla intermedia).
-        abrirUrlConEstrategias(urlPago);
-      }
+      window.location.href = urlPago;
+      setTimeout(() => {
+        setCargando(null);
+        setError("No se pudo abrir el pago automáticamente. Probá de nuevo.");
+      }, 2500);
 
     } catch (e) {
       console.error("[pagar] error:", e);
