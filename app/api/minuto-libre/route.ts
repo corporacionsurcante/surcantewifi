@@ -4,15 +4,15 @@ import { autorizarClienteEnOmada } from "@/lib/omada";
 
 const redis = Redis.fromEnv();
 const CLAVE_FLUJO_MP = "mp:flujo:";
-const UN_MINUTO = 1;
+const MINUTOS_CONEXION_TEMPORAL = 3;
 
 export async function POST(solicitud: NextRequest) {
   const cuerpo = await solicitud.json();
   const { clientMac, apMac, ssidName, site, planId } = cuerpo ?? {};
 
-  if (!clientMac || !planId) {
+  if (!clientMac) {
     return NextResponse.json(
-      { exito: false, motivo: "Faltan datos para activar el minuto libre" },
+      { exito: false, motivo: "Faltan datos para activar la conexión temporal" },
       { status: 400 }
     );
   }
@@ -22,7 +22,7 @@ export async function POST(solicitud: NextRequest) {
     apMac: apMac ?? "",
     ssidName: ssidName ?? "",
     site: site ?? "",
-    minutos: UN_MINUTO,
+    minutos: MINUTOS_CONEXION_TEMPORAL,
   });
 
   if (!resultadoOmada.exito) {
@@ -31,7 +31,7 @@ export async function POST(solicitud: NextRequest) {
         exito: false,
         motivo:
           resultadoOmada.motivo ??
-          "No pudimos activar el minuto libre en este momento",
+          "No pudimos activar la conexión temporal en este momento",
       },
       { status: 500 }
     );
@@ -40,15 +40,17 @@ export async function POST(solicitud: NextRequest) {
   await redis.set(
     `${CLAVE_FLUJO_MP}${clientMac}`,
     JSON.stringify({
-      planId,
+      planId: planId ?? null,
       habilitadoEn: Date.now(),
       expiracionMs: Date.now() + 15 * 60 * 1000,
+      tipo: "conexion-temporal",
     }),
     { ex: 60 * 15 }
   );
 
   return NextResponse.json({
     exito: true,
-    minutos: UN_MINUTO,
+    minutos: MINUTOS_CONEXION_TEMPORAL,
+    portalUrl: process.env.NEXT_PUBLIC_PORTAL_URL ?? "https://surcantewifi.vercel.app",
   });
 }
