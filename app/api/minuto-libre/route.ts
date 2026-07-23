@@ -17,6 +17,17 @@ export async function POST(solicitud: NextRequest) {
     );
   }
 
+  if (!site) {
+    return NextResponse.json(
+      {
+        exito: false,
+        motivo:
+          "Omada no envio el parametro site. Revisá la configuración de External Portal Server.",
+      },
+      { status: 400 }
+    );
+  }
+
   const resultadoOmada = await autorizarClienteEnOmada({
     clientMac,
     apMac: apMac ?? "",
@@ -51,6 +62,6 @@ export async function POST(solicitud: NextRequest) {
   return NextResponse.json({
     exito: true,
     minutos: MINUTOS_CONEXION_TEMPORAL,
-    portalUrl: process.env.NEXT_PUBLIC_PORTAL_URL ?? "https://surcantewifi.vercel.app",
+    portalUrl: solicitud.nextUrl.origin,
   });
 }
