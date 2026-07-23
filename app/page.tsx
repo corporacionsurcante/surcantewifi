@@ -23,6 +23,7 @@ function ContenidoPortal() {
   const [mpListoParaPagoDirecto, setMpListoParaPagoDirecto] = useState(false);
   const [mostrarConfirmMinutoLibre, setMostrarConfirmMinutoLibre] = useState(false);
   const [activandoMinutoLibre, setActivandoMinutoLibre] = useState(false);
+  const [esCNA, setEsCNA] = useState(false);
 
   const [mostrarCodigo, setMostrarCodigo] = useState(false);
   const [codigo, setCodigo] = useState("");
@@ -107,6 +108,15 @@ function ContenidoPortal() {
       .finally(() => setVerificando(false));
   }, [macDePrueba, parametros]);
 
+  useEffect(() => {
+    const ua = navigator.userAgent;
+    const esIOS = /iphone|ipad|ipod/i.test(ua);
+    const esAnd = /android/i.test(ua);
+    const iosCna = esIOS && /applewebkit/i.test(ua) && /mobile/i.test(ua) && !ua.includes("Safari");
+    const androidCpmb = esAnd && !/chrome/i.test(ua);
+    setEsCNA(iosCna || androidCpmb);
+  }, []);
+
   // --- Pago con Mercado Pago ---
   // Genera preferencia y navega directo al link de Mercado Pago.
   // Ese link (mobile_init_point) permite que iOS/Android abran la app
@@ -135,10 +145,25 @@ function ContenidoPortal() {
       const urlPago = datos.urlPago;
       if (!urlPago) throw new Error("No se recibió urlPago");
 
-      window.location.href = urlPago;
+      if (medio === "mp" && esCNA) {
+        const enlace = document.createElement("a");
+        enlace.href = urlPago;
+        enlace.target = "_blank";
+        enlace.rel = "noopener noreferrer";
+        document.body.appendChild(enlace);
+        enlace.click();
+        document.body.removeChild(enlace);
+
+        setTimeout(() => {
+          window.location.href = urlPago;
+        }, 900);
+      } else {
+        window.location.href = urlPago;
+      }
+
       setTimeout(() => {
         setCargando(null);
-        setError("No se pudo abrir el pago automáticamente. Probá de nuevo.");
+        setError("No se pudo abrir la app automáticamente. Probá una vez más.");
       }, 2500);
 
     } catch (e) {
