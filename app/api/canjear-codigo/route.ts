@@ -7,6 +7,7 @@ const UN_ANIO_EN_MINUTOS = 60 * 24 * 365;
 export async function POST(solicitud: NextRequest) {
   const cuerpo = await solicitud.json();
   const { codigo, clientMac, apMac, ssidName, site } = cuerpo;
+  const siteFinal = site || process.env.OMADA_DEFAULT_SITE || "";
 
   if (!codigo || !clientMac) {
     return NextResponse.json(
@@ -22,7 +23,7 @@ export async function POST(solicitud: NextRequest) {
       clientMac,
       apMac: apMac ?? "",
       ssidName: ssidName ?? "",
-      site: site ?? "",
+      site: siteFinal,
       minutos: UN_ANIO_EN_MINUTOS,
     });
 

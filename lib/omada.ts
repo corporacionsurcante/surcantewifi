@@ -136,11 +136,13 @@ export async function autorizarClienteEnOmada(parametros: {
     };
   }
 
-  if (!parametros.site) {
+  const site = parametros.site || process.env.OMADA_DEFAULT_SITE || "";
+
+  if (!site) {
     console.error(
-      "[omada] No se recibió el nombre del sitio (site) en la solicitud de autorización."
+      "[omada] No se recibio el nombre del sitio (site) y no hay OMADA_DEFAULT_SITE configurado."
     );
-    return { exito: false, motivo: "Falta el nombre del sitio" };
+    return { exito: false, motivo: "Falta site en Omada (configure OMADA_DEFAULT_SITE)" };
   }
 
   try {
@@ -166,7 +168,7 @@ export async function autorizarClienteEnOmada(parametros: {
           apMac: parametros.apMac,
           ssidName: parametros.ssidName,
           radioId: "0",
-          site: parametros.site,
+          site,
           // El controlador espera el tiempo de autorización en
           // segundos a partir de ahora.
           time: String(parametros.minutos * 60),

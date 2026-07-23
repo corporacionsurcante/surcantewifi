@@ -60,7 +60,7 @@ export async function POST(solicitud: NextRequest) {
       clientMac: clientMac ?? "",
       apMac: apMac ?? "",
       ssidName: ssidName ?? "",
-      site: site ?? "",
+      site: site || process.env.OMADA_DEFAULT_SITE || "",
       redirectUrl: redirectUrl ?? "",
       creadoEn: Date.now(),
       confirmadoEn: null,
