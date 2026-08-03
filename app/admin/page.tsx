@@ -182,7 +182,7 @@ export default function PanelAdmin() {
     try {
       await enviarPostAuth("/api/auth/signin/google");
     } catch {
-      setError("No se pudo iniciar sesión con Google.");
+      setError("No se pudo iniciar sesin con Google.");
     }
   }
 
@@ -192,7 +192,7 @@ export default function PanelAdmin() {
     try {
       await enviarPostAuth("/api/auth/signout");
     } catch {
-      setError("No se pudo cerrar sesión.");
+      setError("No se pudo cerrar sesin.");
     }
   }
   async function verificarSesionGoogle() {
@@ -288,7 +288,7 @@ export default function PanelAdmin() {
     if (authError === "AccessDenied") {
       setError("Tu cuenta de Google no tiene permisos de administrador.");
     } else if (authError) {
-      setError("Falló el login con Google. Revisá OAuth en Google Cloud y Vercel.");
+      setError("Fall el login con Google. Revis OAuth en Google Cloud y Vercel.");
     }
     verificarSesionGoogle();
   }, []);
@@ -440,18 +440,18 @@ export default function PanelAdmin() {
                         <span className={`text-xs px-2 py-0.5 rounded-full ${
                           ap.estado === "conectado" ? "bg-green-900 text-green-400" : "bg-red-900 text-red-400"
                         }`}>
-                          {ap.estado === "conectado" ? "â— Online" : "â— Offline"}
+                          {ap.estado === "conectado" ? " Online" : " Offline"}
                         </span>
                         <span className="text-[#A0A0A8] text-xs">{ap.clientesConectados} pasajeros</span>
                       </div>
                     </div>
                     {ap.ubicacion ? (
                       <div className="mt-2">
-                        <p className="text-[#5A5A60] text-xs mb-1">ðŸ“ {ap.ubicacion.ciudad}, {ap.ubicacion.region}</p>
+                        <p className="text-[#5A5A60] text-xs mb-1"> {ap.ubicacion.ciudad}, {ap.ubicacion.region}</p>
                         <a href={`https://www.google.com/maps?q=${ap.ubicacion.lat},${ap.ubicacion.lon}`}
                           target="_blank" rel="noopener noreferrer"
                           className="text-[#8B5FBF] text-xs underline">
-                          Ver en Google Maps â†’
+                          Ver en Google Maps 
                         </a>
                       </div>
                     ) : (
@@ -538,9 +538,9 @@ export default function PanelAdmin() {
                       {c.estado === "usado" ? "Usado" : "Disponible"}
                     </span>
                   </div>
-                  <p className="text-[#5A5A60] text-xs mt-1">Creado por {c.creadoPor} Â· {formatFecha(c.creadoEn)}</p>
+                  <p className="text-[#5A5A60] text-xs mt-1">Creado por {c.creadoPor}  {formatFecha(c.creadoEn)}</p>
                   {c.estado === "usado" && c.mac && (
-                    <p className="text-[#5A5A60] text-xs mt-0.5 font-mono">{c.mac} Â· {c.usadoEn ? formatFecha(c.usadoEn) : ""}</p>
+                    <p className="text-[#5A5A60] text-xs mt-0.5 font-mono">{c.mac}  {c.usadoEn ? formatFecha(c.usadoEn) : ""}</p>
                   )}
                 </div>
               ))}
