@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listarTodosLosPagos } from "@/lib/pagos";
 import { listarTodosLosCodigos } from "@/lib/codigos";
-import { PLANES } from "@/lib/planes";
+import { obtenerPlanesDesdeRedis } from "@/lib/planes";
 
 function verificarAdmin(solicitud: NextRequest): boolean {
   const clave = solicitud.headers.get("x-admin-key");
@@ -13,19 +13,20 @@ export async function GET(solicitud: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const [pagos, codigos] = await Promise.all([
+  const [pagos, codigos, planes] = await Promise.all([
     listarTodosLosPagos(),
     listarTodosLosCodigos(),
+    obtenerPlanesDesdeRedis(),
   ]);
 
   const pagosConfirmados = pagos.filter((p) => p.confirmadoEn !== null);
 
   const recaudacionTotal = pagosConfirmados.reduce(
-    (acc, p) => acc + (p.monto ?? PLANES.find((pl) => pl.id === p.planId)?.precio ?? 0),
+    (acc, p) => acc + (p.monto ?? planes.find((pl) => pl.id === p.planId)?.precio ?? 0),
     0
   );
 
-  const porPlan = PLANES.map((plan) => {
+  const porPlan = planes.map((plan) => {
     const pagosDelPlan = pagosConfirmados.filter((p) => p.planId === plan.id);
     return {
       plan: plan.nombre,
@@ -40,7 +41,7 @@ export async function GET(solicitud: NextRequest) {
     (p) => p.confirmadoEn && p.confirmadoEn >= hoy.getTime()
   );
   const recaudacionHoy = pagosHoy.reduce(
-    (acc, p) => acc + (p.monto ?? PLANES.find((pl) => pl.id === p.planId)?.precio ?? 0),
+    (acc, p) => acc + (p.monto ?? planes.find((pl) => pl.id === p.planId)?.precio ?? 0),
     0
   );
 
@@ -55,8 +56,8 @@ export async function GET(solicitud: NextRequest) {
     pagos: pagosConfirmados.map((p) => ({
       id: p.preferenciaId,
       mac: p.clientMac,
-      plan: PLANES.find((pl) => pl.id === p.planId)?.nombre ?? p.planId,
-      monto: p.monto ?? PLANES.find((pl) => pl.id === p.planId)?.precio ?? 0,
+      plan: planes.find((pl) => pl.id === p.planId)?.nombre ?? p.planId,
+      monto: p.monto ?? planes.find((pl) => pl.id === p.planId)?.precio ?? 0,
       procesador: p.procesador ?? "mp",
       fechaPago: p.confirmadoEn,
       duracionMinutos: p.duracionMinutos,

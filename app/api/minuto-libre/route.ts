@@ -17,6 +17,18 @@ export async function POST(solicitud: NextRequest) {
     );
   }
 
+  const rateKey = `rate:minuto:${clientMac}`;
+  const rateCount = await redis.incr(rateKey);
+  if (rateCount === 1) {
+    await redis.expire(rateKey, 86400);
+  }
+  if (rateCount > 3) {
+    return NextResponse.json(
+      { error: "Limite de conexiones temporales alcanzado" },
+      { status: 429 }
+    );
+  }
+
   const resultadoOmada = await autorizarClienteEnOmada({
     clientMac,
     apMac: apMac ?? "",

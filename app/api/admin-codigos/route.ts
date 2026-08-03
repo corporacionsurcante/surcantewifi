@@ -21,9 +21,6 @@ export async function POST(solicitud: NextRequest) {
   const cuerpo = await solicitud.json().catch(() => ({}));
   const creadoPor = cuerpo.creadoPor ?? "ADMIN";
   const cantidad = Math.min(Number(cuerpo.cantidad) || 1, 50);
-  const codigos = [];
-  for (let i = 0; i < cantidad; i++) {
-    codigos.push(await crearCodigo(creadoPor));
-  }
+  const codigos = await Promise.all(Array.from({ length: cantidad }, () => crearCodigo(creadoPor)));
   return NextResponse.json({ codigos });
 }

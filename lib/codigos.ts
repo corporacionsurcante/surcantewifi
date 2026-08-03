@@ -1,4 +1,4 @@
-﻿import { Redis } from "@upstash/redis";
+import { Redis } from "@upstash/redis";
 
 const redis = Redis.fromEnv();
 
@@ -56,13 +56,18 @@ export async function usarCodigo(
     return { exito: false, motivo: "Este codigo ya fue utilizado" };
   }
 
-  codigo.usadoEn = Date.now();
-  codigo.clientMac = clientMac;
-  await redis.set(key, JSON.stringify(codigo), { ex: 60 * 60 * 24 * 400 });
+  const usadoEn = Date.now();
+  // Atomic: NX ensures only one request can claim the code even under concurrent access
+  const usedKey = `${key}:usado`;
+  const claimed = await redis.set(usedKey, JSON.stringify({ usadoEn, clientMac }), { nx: true, ex: 60 * 60 * 24 * 400 });
+  if (claimed === null) {
+    return { exito: false, motivo: "Este codigo ya fue utilizado" };
+  }
+  await redis.set(key, JSON.stringify({ ...codigo, usadoEn, clientMac }), { ex: 60 * 60 * 24 * 400 });
 
   const macKey = `${PREFIJO_MAC}${clientMac}`;
   await redis.set(macKey, JSON.stringify({
-    usadoEn: codigo.usadoEn,
+    usadoEn,
     duracionMinutos: codigo.duracionMinutos,
     tipo: "codigo",
     codigo: codigoStr,

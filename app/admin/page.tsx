@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, useCallback } from "react";
 
@@ -182,7 +182,7 @@ export default function PanelAdmin() {
     try {
       await enviarPostAuth("/api/auth/signin/google");
     } catch {
-      setError("No se pudo iniciar sesin con Google.");
+      setError("No se pudo iniciar sesion con Google.");
     }
   }
 
@@ -192,7 +192,7 @@ export default function PanelAdmin() {
     try {
       await enviarPostAuth("/api/auth/signout");
     } catch {
-      setError("No se pudo cerrar sesin.");
+      setError("No se pudo cerrar sesion.");
     }
   }
   async function verificarSesionGoogle() {

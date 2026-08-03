@@ -1,1 +1,1 @@
-﻿{"regions":["gru1"],"functions":{"app/api/**/*.ts":{"maxDuration":30}}}
+{"regions":["gru1"],"functions":{"app/api/**/*.ts":{"maxDuration":30}}}

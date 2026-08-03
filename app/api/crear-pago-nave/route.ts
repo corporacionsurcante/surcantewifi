@@ -114,7 +114,7 @@ export async function POST(solicitud: NextRequest) {
 
     // Guardamos el pago pendiente para procesarlo cuando llegue
     // la notificación de Nave vía webhook.
-    guardarPagoPendiente({
+    await guardarPagoPendiente({
       preferenciaId: referenciaExterna,
       planId: plan.id,
       duracionMinutos: plan.duracionMinutos,

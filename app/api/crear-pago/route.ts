@@ -53,7 +53,7 @@ export async function POST(solicitud: NextRequest) {
       },
     });
 
-    guardarPagoPendiente({
+    await guardarPagoPendiente({
       preferenciaId: referenciaExterna,
       planId: plan.id,
       duracionMinutos: plan.duracionMinutos,

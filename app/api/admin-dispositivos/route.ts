@@ -130,9 +130,11 @@ export async function GET(solicitud: NextRequest) {
         const esPrivada = !ipGeo || ipGeo.startsWith("192.") || ipGeo.startsWith("10.") || ipGeo.startsWith("172.");
         try {
           const url = esPrivada
-            ? `http://ip-api.com/json/?fields=lat,lon,city,regionName,status`
-            : `http://ip-api.com/json/${ipGeo}?fields=lat,lon,city,regionName,status`;
-          const geoResp = await fetch(url);
+            ? `https://ip-api.com/json/?fields=lat,lon,city,regionName,status`
+            : `https://ip-api.com/json/${ipGeo}?fields=lat,lon,city,regionName,status`;
+          const geoCtrl = new AbortController();
+          const geoTimeout = setTimeout(() => geoCtrl.abort(), 3000);
+          const geoResp = await fetch(url, { signal: geoCtrl.signal }).finally(() => clearTimeout(geoTimeout));
           const geo = await geoResp.json();
           if (geo.status === "success") {
             return { ...ap, ubicacion: { lat: geo.lat, lon: geo.lon, ciudad: geo.city, region: geo.regionName } };

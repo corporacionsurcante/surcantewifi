@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -55,7 +55,7 @@ function ContenidoPagar() {
         setCopiado(true);
         setTimeout(() => setCopiado(false), 3000);
       } catch {
-        prompt("CopiÃ¡ este enlace manualmente:", urlPago);
+        prompt("Copiá este enlace manualmente:", urlPago);
       }
     }
   }
@@ -70,7 +70,7 @@ function ContenidoPagar() {
     return (
       <main className="min-h-screen flex items-center justify-center bg-[#0A0A0C] px-5">
         <p className="text-[#A0A0A8] text-sm text-center">
-          Enlace de pago no disponible. VolvÃ© e intentÃ¡ de nuevo.
+          Enlace de pago no disponible. Volvé e intentá de nuevo.
         </p>
       </main>
     );
@@ -101,17 +101,17 @@ function ContenidoPagar() {
                 âš ï¸ Este navegador tiene limitaciones
               </p>
               <p className="text-[#C8A000] text-xs leading-relaxed">
-                El navegador del portal WiFi no puede abrir la app de Mercado Pago directamente. UsÃ¡ una de las opciones de abajo para pagar sin tener que loguearte.
+                El navegador del portal WiFi no puede abrir la app de Mercado Pago directamente. Usá una de las opciones de abajo para pagar sin tener que loguearte.
               </p>
             </div>
 
-            {/* OpciÃ³n 1: WhatsApp (la mÃ¡s confiable) */}
+            {/* Opción 1: WhatsApp (la más confiable) */}
             <div className="bg-[#0d1f14] border border-[#25D366] rounded-2xl p-4 mb-4">
               <p className="text-[#25D366] text-sm font-medium mb-1">
-                âœ… OpciÃ³n recomendada: WhatsApp
+                âœ… Opción recomendada: WhatsApp
               </p>
               <p className="text-[#A0A0A8] text-xs mb-3 leading-relaxed">
-                Te enviamos el enlace por WhatsApp. Desde la app, tocÃ¡s el link y se abre directamente en Mercado Pago (donde ya estÃ¡s logueado).
+                Te enviamos el enlace por WhatsApp. Desde la app, tocás el link y se abre directamente en Mercado Pago (donde ya estás logueado).
               </p>
               <button
                 onClick={abrirWhatsApp}
@@ -121,31 +121,31 @@ function ContenidoPagar() {
               </button>
             </div>
 
-            {/* OpciÃ³n 2: Copiar enlace */}
+            {/* Opción 2: Copiar enlace */}
             <div className="bg-[#18181B] border border-[#2A2A2E] rounded-2xl p-4 mb-4">
-              <p className="text-white text-sm font-medium mb-1">OpciÃ³n 2: Copiar enlace</p>
+              <p className="text-white text-sm font-medium mb-1">Opción 2: Copiar enlace</p>
               <p className="text-[#A0A0A8] text-xs mb-3 leading-relaxed">
-                CopiÃ¡ el enlace, cerrÃ¡ esta ventana (tocÃ¡ <strong className="text-white">Cancelar</strong> o <strong className="text-white">Listo</strong>), abrÃ­ Safari o Chrome y pegÃ¡ el enlace en la barra de direcciones.
+                Copiá el enlace, cerrá esta ventana (tocá <strong className="text-white">Cancelar</strong> o <strong className="text-white">Listo</strong>), abrí Safari o Chrome y pegá el enlace en la barra de direcciones.
               </p>
               <button
                 onClick={copiarEnlace}
                 className="w-full py-3 rounded-xl text-[14px] font-medium bg-[#2A2A2E] text-white hover:bg-[#3A3A3E] transition"
               >
-                {copiado ? "âœ“ Â¡Enlace copiado!" : "ðŸ“‹ Copiar enlace de pago"}
+                {copiado ? "âœ“ ¡Enlace copiado!" : "ðŸ“‹ Copiar enlace de pago"}
               </button>
               {copiado && (
                 <p className="text-[#25D366] text-xs text-center mt-2">
-                  Ahora cerrÃ¡ esta ventana y pegalo en Safari o Chrome
+                  Ahora cerrá esta ventana y pegalo en Safari o Chrome
                 </p>
               )}
             </div>
 
-            {/* OpciÃ³n 3 Android: intent link (requiere tap del usuario) */}
+            {/* Opción 3 Android: intent link (requiere tap del usuario) */}
             {esAndroid && (
               <div className="bg-[#18181B] border border-[#2A2A2E] rounded-2xl p-4 mb-4">
-                <p className="text-white text-sm font-medium mb-1">OpciÃ³n 3: Abrir en Mercado Pago</p>
+                <p className="text-white text-sm font-medium mb-1">Opción 3: Abrir en Mercado Pago</p>
                 <p className="text-[#A0A0A8] text-xs mb-3">
-                  IntentÃ¡ abrir la app directamente. El sistema te preguntarÃ¡ si querÃ©s continuar.
+                  Intentá abrir la app directamente. El sistema te preguntará si querés continuar.
                 </p>
                 <a
                   href={buildAndroidIntent(urlPago)}
@@ -168,7 +168,7 @@ function ContenidoPagar() {
           /* â”€â”€ Modo navegador normal: mostrar opciones y redirigir â”€â”€ */
           <>
             <div className="bg-[#18181B] border border-[#2A2A2E] rounded-2xl p-4 mb-4 text-center">
-              <p className="text-[#A0A0A8] text-sm mb-3">Tu pago estÃ¡ listo</p>
+              <p className="text-[#A0A0A8] text-sm mb-3">Tu pago está listo</p>
               <a
                 href={urlPago}
                 className="block w-full py-3.5 rounded-xl text-[15px] font-medium bg-[#009EE3] text-white hover:bg-[#007bbd] transition mb-3"
@@ -193,7 +193,7 @@ function ContenidoPagar() {
         )}
 
         <p className="text-[11px] text-[#3A3A40] text-center mt-6">
-          Al continuar aceptÃ¡s los tÃ©rminos de servicio Â· Surcante
+          Al continuar aceptás los términos de servicio · Surcante
         </p>
 
       </div>

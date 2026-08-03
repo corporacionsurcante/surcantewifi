@@ -44,6 +44,9 @@ export async function POST(solicitud: NextRequest) {
     // Para pagos: acceso por la duración del plan
     const ahora = Date.now();
     const tiempoUsado = registro.usadoEn || registro.confirmadoEn;
+    if (!tiempoUsado) {
+      return NextResponse.json({ tieneAcceso: false });
+    }
     const duracionMs = (registro.duracionMinutos ?? 60 * 24 * 365) * 60 * 1000;
     const expira = tiempoUsado + duracionMs;
 

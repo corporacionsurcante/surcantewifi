@@ -46,12 +46,16 @@ export async function GET(solicitud: NextRequest) {
   const internos = await redis.smembers("buses:activos");
   const buses: UbicacionBus[] = [];
 
-  for (const interno of internos) {
-    const datos = await redis.get<string>(`bus:${interno}`);
-    if (datos) {
-      const bus = typeof datos === "string" ? JSON.parse(datos) : datos;
-      if (Date.now() - bus.actualizadoEn < 600000) {
-        buses.push(bus);
+  if (internos.length > 0) {
+    const keys = (internos as string[]).map((id) => `bus:${id}`);
+    const resultados = await redis.mget<string[]>(...keys);
+    const ahora = Date.now();
+    for (const dato of resultados) {
+      if (dato) {
+        const bus = typeof dato === "string" ? JSON.parse(dato) : dato as unknown as UbicacionBus;
+        if (ahora - bus.actualizadoEn < 600000) {
+          buses.push(bus);
+        }
       }
     }
   }
