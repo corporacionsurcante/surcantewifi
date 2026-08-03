@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { buscarPago, marcarPagoConfirmado } from "@/lib/pagos";
 import { autorizarClienteEnOmada } from "@/lib/omada";
+import { obtenerTokenNave } from "@/lib/nave";
 
 // ──────────────────────────────────────────────────────────────
 // Webhook de Nave: recibe notificaciones cuando un pago cambia
@@ -9,29 +10,6 @@ import { autorizarClienteEnOmada } from "@/lib/omada";
 //
 // Nave reintenta hasta 5 veces si no recibimos HTTP 200.
 // ──────────────────────────────────────────────────────────────
-
-const esSandbox = process.env.NAVE_SANDBOX === "true";
-
-const NAVE_AUTH_URL = esSandbox
-  ? "https://homoservices.apinaranja.com/security-ms/api/security/auth0/b2b/m2msPrivate"
-  : "https://services.apinaranja.com/security-ms/api/security/auth0/b2b/m2msPrivate";
-
-async function obtenerTokenNave(): Promise<string> {
-  const respuesta = await fetch(NAVE_AUTH_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        client_id: process.env.NAVE_CLIENT_ID,
-        client_secret: process.env.NAVE_CLIENT_SECRET,
-        audience:
-          process.env.NAVE_AUDIENCE ??
-          "https://naranja.com/ranty/merchants/api",
-      }),
-    }
-  );
-  const datos = await respuesta.json();
-  return datos.access_token;
-}
 
 export async function POST(solicitud: NextRequest) {
   const cuerpo = await solicitud.json();

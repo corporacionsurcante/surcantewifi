@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 
 const redis = Redis.fromEnv();
@@ -15,6 +15,12 @@ export type UbicacionBus = {
 
 export async function POST(solicitud: NextRequest) {
   const cuerpo = await solicitud.json();
+
+  const busToken = solicitud.headers.get("x-bus-token");
+  if (process.env.BUS_TRACKER_TOKEN && busToken !== process.env.BUS_TRACKER_TOKEN) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
   const { interno, lat, lon, precision, velocidad, rumbo } = cuerpo;
 
   if (!interno || !lat || !lon) {

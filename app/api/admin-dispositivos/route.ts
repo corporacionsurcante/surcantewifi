@@ -1,6 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
+import { Redis } from "@upstash/redis";
 import { Agent } from "undici";
 
+const redis = Redis.fromEnv();
 const agente = new Agent({ connect: { rejectUnauthorized: false } });
 
 function verificarAdmin(solicitud: NextRequest): boolean {
@@ -16,6 +18,10 @@ async function obtenerIdControlador(urlBase: string): Promise<string> {
   return d.result.omadacId;
 }
 
+// IMPORTANTE: Esta función usa OMADA_ADMIN_USER/OMADA_ADMIN_PASSWORD (login general de Omada).
+// El usuario "operador" de Hotspot Management NO tiene permisos para listar dispositivos/clientes.
+// Crear un usuario admin de solo lectura en Omada y setear OMADA_ADMIN_USER y OMADA_ADMIN_PASSWORD
+// en Vercel como variables de entorno separadas de las del operador de hotspot.
 async function obtenerToken(urlBase: string, idControlador: string) {
   const usuario = process.env.OMADA_ADMIN_USER || process.env.OMADA_OPERATOR_USER;
   const contrasena = process.env.OMADA_ADMIN_PASSWORD || process.env.OMADA_OPERATOR_PASSWORD;
@@ -129,6 +135,10 @@ export async function GET(solicitud: NextRequest) {
         const ipGeo = ap.ipPublica || ap.ip;
         const esPrivada = !ipGeo || ipGeo.startsWith("192.") || ipGeo.startsWith("10.") || ipGeo.startsWith("172.");
         try {
+          const cacheKey = `geo-ip:${ipGeo}`;
+          const cached = await redis.get<{lat:number;lon:number;ciudad:string;region:string}>(cacheKey);
+          if (cached) return { ...ap, ubicacion: cached };
+
           const url = esPrivada
             ? `https://ip-api.com/json/?fields=lat,lon,city,regionName,status`
             : `https://ip-api.com/json/${ipGeo}?fields=lat,lon,city,regionName,status`;
@@ -137,7 +147,9 @@ export async function GET(solicitud: NextRequest) {
           const geoResp = await fetch(url, { signal: geoCtrl.signal }).finally(() => clearTimeout(geoTimeout));
           const geo = await geoResp.json();
           if (geo.status === "success") {
-            return { ...ap, ubicacion: { lat: geo.lat, lon: geo.lon, ciudad: geo.city, region: geo.regionName } };
+            const ubicacion = { lat: geo.lat, lon: geo.lon, ciudad: geo.city, region: geo.regionName };
+            await redis.set(cacheKey, JSON.stringify(ubicacion), { ex: 3600 });
+            return { ...ap, ubicacion };
           }
         } catch { /* sin ubicación */ }
         return { ...ap, ubicacion: null };

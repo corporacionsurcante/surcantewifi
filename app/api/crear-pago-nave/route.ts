@@ -1,6 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
-import { obtenerPlanesDesdeRedis, buscarPlan } from "@/lib/planes";
+﻿import { NextRequest, NextResponse } from "next/server";
+import { obtenerPlanesDesdeRedis, buscarPlan, precioConDescuento } from "@/lib/planes";
 import { guardarPagoPendiente } from "@/lib/pagos";
+import { generarReferenciaExterna } from "@/lib/ids";
+import { obtenerTokenNave, NAVE_PAYMENT_URL } from "@/lib/nave";
 
 // ──────────────────────────────────────────────────────────────
 // Integración con Nave (Banco Galicia) para crear una intención
@@ -15,34 +17,6 @@ import { guardarPagoPendiente } from "@/lib/pagos";
 //   NAVE_SANDBOX         → "true" para usar sandbox, vacío para producción
 // ──────────────────────────────────────────────────────────────
 
-const esSandbox = process.env.NAVE_SANDBOX === "true";
-
-const NAVE_AUTH_URL = esSandbox
-  ? "https://homoservices.apinaranja.com/security-ms/api/security/auth0/b2b/m2msPrivate"
-  : "https://services.apinaranja.com/security-ms/api/security/auth0/b2b/m2msPrivate";
-
-const NAVE_PAYMENT_URL = esSandbox
-  ? "https://api-sandbox.ranty.io/api/payment_request/ecommerce"
-  : "https://api.ranty.io/api/payment_request/ecommerce";
-
-async function obtenerTokenNave(): Promise<string> {
-  const respuesta = await fetch(NAVE_AUTH_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        client_id: process.env.NAVE_CLIENT_ID,
-        client_secret: process.env.NAVE_CLIENT_SECRET,
-        audience: process.env.NAVE_AUDIENCE ?? "https://naranja.com/ranty/merchants/api",
-      }),
-    }
-  );
-  const datos = await respuesta.json();
-  if (!datos.access_token) {
-    throw new Error(`No se pudo obtener token de Nave: ${JSON.stringify(datos)}`);
-  }
-  return datos.access_token;
-}
-
 export async function POST(solicitud: NextRequest) {
   const cuerpo = await solicitud.json();
   const { planId, clientMac, apMac, redirectUrl, ssidName, site } = cuerpo;
@@ -53,13 +27,9 @@ export async function POST(solicitud: NextRequest) {
     return NextResponse.json({ error: "Plan inválido" }, { status: 400 });
   }
 
-  const precioFinal = plan.descuento > 0
-    ? Math.round(plan.precio * (1 - plan.descuento / 100))
-    : plan.precio;
+  const precioFinal = precioConDescuento(plan);
 
-  const referenciaExterna = `surcante-${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2, 8)}`;
+  const referenciaExterna = generarReferenciaExterna();
 
   const origen = solicitud.nextUrl.origin;
 
@@ -97,7 +67,7 @@ export async function POST(solicitud: NextRequest) {
             },
           ],
           additional_info: {
-            callback_url: `${origen}/pagado?plan=${plan.id}`,
+            callback_url: `${origen}/pagado?plan=${plan.id}&preferenciaId=${referenciaExterna}`,
           },
           // La intención expira en 10 minutos (600 segundos),
           // suficiente para que el pasajero complete el pago.
@@ -125,6 +95,8 @@ export async function POST(solicitud: NextRequest) {
       redirectUrl: redirectUrl ?? "",
       creadoEn: Date.now(),
       confirmadoEn: null,
+      monto: precioFinal,
+      procesador: "nave" as const,
     });
 
     console.log(

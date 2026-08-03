@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { MercadoPagoConfig, Preference } from "mercadopago";
-import { obtenerPlanesDesdeRedis, buscarPlan } from "@/lib/planes";
+import { obtenerPlanesDesdeRedis, buscarPlan, precioConDescuento } from "@/lib/planes";
 import { guardarPagoPendiente } from "@/lib/pagos";
+import { generarReferenciaExterna } from "@/lib/ids";
 
 const cliente = new MercadoPagoConfig({
   accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN!,
@@ -19,13 +20,9 @@ export async function POST(solicitud: NextRequest) {
   }
 
   // Precio efectivo: aplica descuento si hay promoción activa
-  const precioFinal = plan.descuento > 0
-    ? Math.round(plan.precio * (1 - plan.descuento / 100))
-    : plan.precio;
+  const precioFinal = precioConDescuento(plan);
 
-  const referenciaExterna = `surcante-${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2, 8)}`;
+  const referenciaExterna = generarReferenciaExterna();
 
   const origen = solicitud.nextUrl.origin;
 
@@ -45,8 +42,8 @@ export async function POST(solicitud: NextRequest) {
         external_reference: referenciaExterna,
         notification_url: `${origen}/api/webhook-pago`,
         back_urls: {
-          success: `${origen}/pagado?plan=${plan.id}`,
-          pending: `${origen}/pagado?plan=${plan.id}`,
+          success: `${origen}/pagado?plan=${plan.id}&preferenciaId=${referenciaExterna}`,
+          pending: `${origen}/pagado?plan=${plan.id}&preferenciaId=${referenciaExterna}`,
           failure: `${origen}/error`,
         },
         auto_return: "approved",
@@ -64,6 +61,8 @@ export async function POST(solicitud: NextRequest) {
       redirectUrl: redirectUrl ?? "",
       creadoEn: Date.now(),
       confirmadoEn: null,
+      monto: precioFinal,
+      procesador: "mp" as const,
     });
 
     console.log(

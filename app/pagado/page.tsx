@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -15,6 +15,7 @@ export default function PaginaPagado() {
 function ContenidoPagado() {
   const parametros = useSearchParams();
   const planId = parametros.get("plan") ?? "";
+  const preferenciaId = parametros.get("preferenciaId") ?? "";
   const esDemo = parametros.get("demo") === "true";
   const esCodigo = parametros.get("codigo") === "true";
   const plan = buscarPlan(planId);
@@ -22,6 +23,22 @@ function ContenidoPagado() {
   const [segundosRestantes, setSegundosRestantes] = useState(
     esCodigo ? -1 : plan ? plan.duracionMinutos * 60 : 0
   );
+  const [planNombre, setPlanNombre] = useState(plan?.nombre ?? "tu plan");
+
+  useEffect(() => {
+    if (!preferenciaId) return;
+    fetch(`/api/pago-estado?preferenciaId=${preferenciaId}`)
+      .then((r) => r.json())
+      .then((datos) => {
+        if (datos.duracionMinutos) {
+          setSegundosRestantes(datos.duracionMinutos * 60);
+        }
+        if (datos.planNombre) {
+          setPlanNombre(datos.planNombre);
+        }
+      })
+      .catch(() => { /* mantener valores por defecto */ });
+  }, [preferenciaId]);
 
   useEffect(() => {
     if (esCodigo) return;
@@ -59,7 +76,7 @@ function ContenidoPagado() {
           <PantallaVencido esDemo={esDemo} />
         ) : (
           <PantallaActiva
-            plan={plan?.nombre ?? "tu plan"}
+            plan={planNombre}
             segundosRestantes={segundosRestantes}
             porVencer={porVencer}
             esDemo={esDemo}

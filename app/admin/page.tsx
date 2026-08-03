@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback } from "react";
 
@@ -590,26 +590,26 @@ export default function PanelAdmin() {
                 <div key={p.id}>
                   {editandoPlan?.id === p.id ? (
                     <div className="bg-[#18181B] border border-[#2A2A2E] rounded-2xl p-4">
-                      <input type="text" value={nuevoNombre || editandoPlan.nombre}
+                      <input type="text" value={nuevoNombre}
                         onChange={(e) => setNuevoNombre(e.target.value)}
                         className="w-full px-4 py-2.5 rounded-xl bg-[#0A0A0C] border border-[#2A2A2E] text-white mb-2 text-sm"
                       />
-                      <textarea value={nuevoDescripcion || editandoPlan.descripcion}
+                      <textarea value={nuevoDescripcion}
                         onChange={(e) => setNuevoDescripcion(e.target.value)}
                         className="w-full px-4 py-2.5 rounded-xl bg-[#0A0A0C] border border-[#2A2A2E] text-white mb-2 text-sm resize-none h-20"
                       />
                       <div className="grid grid-cols-2 gap-2 mb-2">
-                        <input type="number" value={nuevoPrecio || editandoPlan.precio}
+                        <input type="number" value={nuevoPrecio}
                           onChange={(e) => setNuevoPrecio(e.target.value)}
                           className="px-4 py-2.5 rounded-xl bg-[#0A0A0C] border border-[#2A2A2E] text-white text-sm"
                         />
-                        <input type="number" value={nuevaDuracion || editandoPlan.duracionMinutos}
+                        <input type="number" value={nuevaDuracion}
                           onChange={(e) => setNuevaDuracion(e.target.value)}
                           className="px-4 py-2.5 rounded-xl bg-[#0A0A0C] border border-[#2A2A2E] text-white text-sm"
                         />
                       </div>
                       <div className="grid grid-cols-2 gap-2 mb-3">
-                        <input type="number" value={nuevoDescuento || editandoPlan.descuento}
+                        <input type="number" value={nuevoDescuento}
                           onChange={(e) => setNuevoDescuento(e.target.value)}
                           placeholder="Descuento %"
                           className="px-4 py-2.5 rounded-xl bg-[#0A0A0C] border border-[#2A2A2E] text-white text-sm"
@@ -625,11 +625,11 @@ export default function PanelAdmin() {
                       <div className="flex gap-2">
                         <button onClick={() => guardarPlan({
                           ...editandoPlan,
-                          nombre: nuevoNombre || editandoPlan.nombre,
-                          descripcion: nuevoDescripcion || editandoPlan.descripcion,
-                          precio: Number(nuevoPrecio) || editandoPlan.precio,
-                          duracionMinutos: Number(nuevaDuracion) || editandoPlan.duracionMinutos,
-                          descuento: Number(nuevoDescuento) || editandoPlan.descuento,
+                          nombre: nuevoNombre,
+                          descripcion: nuevoDescripcion,
+                          precio: Number(nuevoPrecio),
+                          duracionMinutos: Number(nuevaDuracion),
+                          descuento: Number(nuevoDescuento),
                         })}
                           disabled={guardandoPlan}
                           className="flex-1 py-2 rounded-xl bg-green-600 text-white text-sm font-medium disabled:opacity-60">
@@ -668,11 +668,11 @@ export default function PanelAdmin() {
                       <div className="flex gap-2">
                         <button onClick={() => {
                           setEditandoPlan(p);
-                          setNuevoNombre("");
-                          setNuevoDescripcion("");
-                          setNuevoPrecio("");
-                          setNuevaDuracion("");
-                          setNuevoDescuento("");
+                          setNuevoNombre(p.nombre);
+                          setNuevoDescripcion(p.descripcion);
+                          setNuevoPrecio(String(p.precio));
+                          setNuevaDuracion(String(p.duracionMinutos));
+                          setNuevoDescuento(String(p.descuento));
                         }}
                           className="flex-1 py-2 rounded-xl bg-[#6E3FA3] text-white text-sm font-medium">
                           Editar
