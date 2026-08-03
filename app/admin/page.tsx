@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback } from "react";
 
@@ -45,7 +45,7 @@ type ClienteData = {
   ip: string;
   apMac: string;
   ssid: string;
-  señal: number;
+  senal: number;
 };
 
 type PlanData = {
@@ -151,17 +151,50 @@ export default function PanelAdmin() {
     return true;
   }
 
+  async function enviarPostAuth(path: string) {
+    const csrfResp = await fetch("/api/auth/csrf");
+    const csrfData = await csrfResp.json();
+    const csrfToken = csrfData?.csrfToken;
+    if (!csrfToken) throw new Error("csrf-missing");
+
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = path;
+
+    const tokenInput = document.createElement("input");
+    tokenInput.type = "hidden";
+    tokenInput.name = "csrfToken";
+    tokenInput.value = csrfToken;
+    form.appendChild(tokenInput);
+
+    const callbackInput = document.createElement("input");
+    callbackInput.type = "hidden";
+    callbackInput.name = "callbackUrl";
+    callbackInput.value = "/admin";
+    form.appendChild(callbackInput);
+
+    document.body.appendChild(form);
+    form.submit();
+  }
+
   async function iniciarGoogle() {
     setError("");
-    window.location.href = "/api/auth/signin/google?callbackUrl=/admin";
+    try {
+      await enviarPostAuth("/api/auth/signin/google");
+    } catch {
+      setError("No se pudo iniciar sesión con Google.");
+    }
   }
 
   async function cerrarSesionGoogle() {
     setAutenticado(false);
     setClave("");
-    window.location.href = "/api/auth/signout?callbackUrl=/admin";
+    try {
+      await enviarPostAuth("/api/auth/signout");
+    } catch {
+      setError("No se pudo cerrar sesión.");
+    }
   }
-
   async function verificarSesionGoogle() {
     setError("");
     try {
@@ -170,7 +203,7 @@ export default function PanelAdmin() {
       if (r.ok && d.token) {
         await cargarPanelConClave(d.token);
       } else if (r.status !== 401) {
-        setError(d.error ?? "No se pudo validar la sesión");
+        setError(d.error ?? "No se pudo validar la sesion");
       }
     } finally {
       setValidandoSesion(false);
@@ -236,7 +269,7 @@ export default function PanelAdmin() {
   }
 
   async function eliminarPlan(id: string) {
-    if (confirm("¿Está seguro que desea eliminar este plan?")) {
+    if (confirm("Esta seguro que desea eliminar este plan?")) {
       try {
         const r = await fetch(`/api/admin-planes?id=${id}`, {
           method: "DELETE",
@@ -251,12 +284,14 @@ export default function PanelAdmin() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("error") === "AccessDenied") {
+    const authError = params.get("error");
+    if (authError === "AccessDenied") {
       setError("Tu cuenta de Google no tiene permisos de administrador.");
+    } else if (authError) {
+      setError("Falló el login con Google. Revisá OAuth en Google Cloud y Vercel.");
     }
     verificarSesionGoogle();
   }, []);
-
   useEffect(() => {
     if (autenticado && clave) {
       const i = setInterval(() => cargarDatos(clave), 30000);
@@ -297,7 +332,7 @@ export default function PanelAdmin() {
             disabled={validandoSesion}
             className="w-full py-3 rounded-xl bg-white text-black font-medium mb-4 hover:bg-gray-200 transition disabled:opacity-50"
           >
-            {validandoSesion ? "Verificando sesión..." : "Ingresar con Google"}
+            {validandoSesion ? "Verificando sesion..." : "Ingresar con Google"}
           </button>
 
           <div className="flex items-center gap-3 mb-4">
@@ -324,7 +359,7 @@ export default function PanelAdmin() {
 
   const TABS = ["resumen", "dispositivos", "pagos", "codigos", "paquetes", "config"] as const;
   const LABELS: Record<string, string> = {
-    resumen: "Resumen", dispositivos: "Buses", pagos: "Pagos", codigos: "Códigos", paquetes: "Paquetes", config: "Config"
+    resumen: "Resumen", dispositivos: "Buses", pagos: "Pagos", codigos: "Codigos", paquetes: "Paquetes", config: "Config"
   };
 
   return (
@@ -365,7 +400,7 @@ export default function PanelAdmin() {
                 <p className="text-[#A0A0A8] text-xs mt-1">{resumen.pagosHoy} pagos</p>
               </div>
               <div className="bg-[#18181B] border border-[#2A2A2E] rounded-2xl p-4">
-                <p className="text-[#A0A0A8] text-xs mb-1">Total histórico</p>
+                <p className="text-[#A0A0A8] text-xs mb-1">Total historico</p>
                 <p className="text-white text-2xl font-medium">{formatPeso(resumen.recaudacionTotal)}</p>
                 <p className="text-[#A0A0A8] text-xs mt-1">{resumen.totalPagos} pagos</p>
               </div>
@@ -405,22 +440,22 @@ export default function PanelAdmin() {
                         <span className={`text-xs px-2 py-0.5 rounded-full ${
                           ap.estado === "conectado" ? "bg-green-900 text-green-400" : "bg-red-900 text-red-400"
                         }`}>
-                          {ap.estado === "conectado" ? "● Online" : "● Offline"}
+                          {ap.estado === "conectado" ? "â— Online" : "â— Offline"}
                         </span>
                         <span className="text-[#A0A0A8] text-xs">{ap.clientesConectados} pasajeros</span>
                       </div>
                     </div>
                     {ap.ubicacion ? (
                       <div className="mt-2">
-                        <p className="text-[#5A5A60] text-xs mb-1">📍 {ap.ubicacion.ciudad}, {ap.ubicacion.region}</p>
+                        <p className="text-[#5A5A60] text-xs mb-1">ðŸ“ {ap.ubicacion.ciudad}, {ap.ubicacion.region}</p>
                         <a href={`https://www.google.com/maps?q=${ap.ubicacion.lat},${ap.ubicacion.lon}`}
                           target="_blank" rel="noopener noreferrer"
                           className="text-[#8B5FBF] text-xs underline">
-                          Ver en Google Maps →
+                          Ver en Google Maps â†’
                         </a>
                       </div>
                     ) : (
-                      <p className="text-[#5A5A60] text-xs mt-2">📍 Ubicación no disponible</p>
+                      <p className="text-[#5A5A60] text-xs mt-2">Ubicacion no disponible</p>
                     )}
                   </div>
                 ))}
@@ -439,7 +474,7 @@ export default function PanelAdmin() {
                       </div>
                       <div className="text-right">
                         <p className="text-[#A0A0A8] text-xs">{c.ssid}</p>
-                        <p className="text-[#5A5A60] text-xs">Señal: {c.señal}%</p>
+                        <p className="text-[#5A5A60] text-xs">Senal: {c.senal}%</p>
                       </div>
                     </div>
                   </div>
@@ -452,7 +487,7 @@ export default function PanelAdmin() {
         {tab === "pagos" && (
           <div className="flex flex-col gap-2">
             {pagos.length === 0 ? (
-              <p className="text-[#A0A0A8] text-center py-8">Sin pagos todavía</p>
+              <p className="text-[#A0A0A8] text-center py-8">Sin pagos todavia</p>
             ) : pagos.map((p) => (
               <div key={p.id} className="bg-[#18181B] border border-[#2A2A2E] rounded-2xl p-4">
                 <div className="flex justify-between items-start mb-2">
@@ -472,7 +507,7 @@ export default function PanelAdmin() {
         {tab === "codigos" && (
           <div className="flex flex-col gap-4">
             <div className="bg-[#18181B] border border-[#2A2A2E] rounded-2xl p-4">
-              <p className="text-[#A0A0A8] text-xs mb-3">Generar códigos nuevos</p>
+              <p className="text-[#A0A0A8] text-xs mb-3">Generar codigos nuevos</p>
               <input type="text" value={creadoPor}
                 onChange={(e) => setCreadoPor(e.target.value.toUpperCase())}
                 placeholder="Iniciales (ej: JB, SM)"
@@ -486,13 +521,13 @@ export default function PanelAdmin() {
                 />
                 <button onClick={generarCodigos} disabled={generando || !creadoPor}
                   className="flex-1 py-2.5 rounded-xl bg-[#6E3FA3] text-white text-sm font-medium disabled:opacity-60">
-                  {generando ? "Generando..." : `Generar ${cantidadCodigos} código${cantidadCodigos > 1 ? "s" : ""}`}
+                  {generando ? "Generando..." : `Generar ${cantidadCodigos} codigo${cantidadCodigos > 1 ? "s" : ""}`}
                 </button>
               </div>
             </div>
             <div className="flex flex-col gap-2">
               {codigos.length === 0 ? (
-                <p className="text-[#A0A0A8] text-center py-8">Sin códigos todavía</p>
+                <p className="text-[#A0A0A8] text-center py-8">Sin codigos todavia</p>
               ) : codigos.map((c) => (
                 <div key={c.codigo} className="bg-[#18181B] border border-[#2A2A2E] rounded-2xl p-4">
                   <div className="flex justify-between items-start">
@@ -503,9 +538,9 @@ export default function PanelAdmin() {
                       {c.estado === "usado" ? "Usado" : "Disponible"}
                     </span>
                   </div>
-                  <p className="text-[#5A5A60] text-xs mt-1">Creado por {c.creadoPor} · {formatFecha(c.creadoEn)}</p>
+                  <p className="text-[#5A5A60] text-xs mt-1">Creado por {c.creadoPor} Â· {formatFecha(c.creadoEn)}</p>
                   {c.estado === "usado" && c.mac && (
-                    <p className="text-[#5A5A60] text-xs mt-0.5 font-mono">{c.mac} · {c.usadoEn ? formatFecha(c.usadoEn) : ""}</p>
+                    <p className="text-[#5A5A60] text-xs mt-0.5 font-mono">{c.mac} Â· {c.usadoEn ? formatFecha(c.usadoEn) : ""}</p>
                   )}
                 </div>
               ))}
@@ -524,7 +559,7 @@ export default function PanelAdmin() {
               />
               <textarea value={nuevoDescripcion}
                 onChange={(e) => setNuevoDescripcion(e.target.value)}
-                placeholder="Descripción"
+                placeholder="Descripcion"
                 className="w-full px-4 py-2.5 rounded-xl bg-[#0A0A0C] border border-[#2A2A2E] text-white mb-2 text-sm resize-none h-20"
               />
               <div className="grid grid-cols-2 gap-2 mb-2">
@@ -535,7 +570,7 @@ export default function PanelAdmin() {
                 />
                 <input type="number" value={nuevaDuracion}
                   onChange={(e) => setNuevaDuracion(e.target.value)}
-                  placeholder="Duración (minutos)"
+                  placeholder="Duracion (minutos)"
                   className="px-4 py-2.5 rounded-xl bg-[#0A0A0C] border border-[#2A2A2E] text-white text-sm"
                 />
               </div>
