@@ -1,4 +1,4 @@
-import { Redis } from "@upstash/redis";
+﻿import { Redis } from "@upstash/redis";
 
 const redis = Redis.fromEnv();
 
@@ -38,10 +38,9 @@ export async function marcarPagoConfirmado(preferenciaId: string): Promise<void>
   const pago = await buscarPago(preferenciaId);
   if (!pago) return;
   pago.confirmadoEn = Date.now();
-  const key = `${PREFIJO_PAGO}${preferenciaId}`;
+  const key = `${PREFIJO_PAGO}${pago.preferenciaId}`;
   await redis.set(key, JSON.stringify(pago), { ex: 60 * 60 * 24 * 30 });
 
-  // Guardamos por MAC para reconexión automática
   if (pago.clientMac) {
     const macKey = `${PREFIJO_MAC}${pago.clientMac}`;
     await redis.set(macKey, JSON.stringify({
@@ -56,10 +55,17 @@ export async function marcarPagoConfirmado(preferenciaId: string): Promise<void>
 export async function listarTodosLosPagos(): Promise<PagoPendiente[]> {
   const ids = await redis.smembers(SET_PAGOS);
   if (!ids || ids.length === 0) return [];
+
+  const keys = (ids as string[]).map((id) => `${PREFIJO_PAGO}${id}`);
+  const resultados = await redis.mget<string[]>(...keys);
+
   const pagos: PagoPendiente[] = [];
-  for (const id of ids) {
-    const pago = await buscarPago(id as string);
-    if (pago) pagos.push(pago);
+  for (const dato of resultados) {
+    if (dato) {
+      try {
+        pagos.push(typeof dato === "string" ? JSON.parse(dato) : dato as unknown as PagoPendiente);
+      } catch { /* ignorar entradas corruptas */ }
+    }
   }
   return pagos.sort((a, b) => b.creadoEn - a.creadoEn);
 }

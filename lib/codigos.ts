@@ -1,4 +1,4 @@
-import { Redis } from "@upstash/redis";
+﻿import { Redis } from "@upstash/redis";
 
 const redis = Redis.fromEnv();
 
@@ -15,7 +15,6 @@ const PREFIJO_CODIGO = "codigo:";
 const PREFIJO_MAC = "mac:";
 const SET_CODIGOS = "codigos:todos";
 
-// Duración por defecto de códigos: 1 año
 const UN_ANIO_EN_MINUTOS = 60 * 24 * 365;
 
 function generarCodigo(): string {
@@ -48,20 +47,19 @@ export async function usarCodigo(
 ): Promise<{ exito: boolean; motivo?: string }> {
   const key = `${PREFIJO_CODIGO}${codigoStr.toUpperCase()}`;
   const datos = await redis.get<string>(key);
-  if (!datos) return { exito: false, motivo: "Código inválido" };
+  if (!datos) return { exito: false, motivo: "Codigo invalido" };
 
   const codigo: Codigo =
     typeof datos === "string" ? JSON.parse(datos) : (datos as Codigo);
 
   if (codigo.usadoEn) {
-    return { exito: false, motivo: "Este código ya fue utilizado" };
+    return { exito: false, motivo: "Este codigo ya fue utilizado" };
   }
 
   codigo.usadoEn = Date.now();
   codigo.clientMac = clientMac;
   await redis.set(key, JSON.stringify(codigo), { ex: 60 * 60 * 24 * 400 });
 
-  // Guardamos por MAC para reconexión automática
   const macKey = `${PREFIJO_MAC}${clientMac}`;
   await redis.set(macKey, JSON.stringify({
     usadoEn: codigo.usadoEn,
@@ -76,14 +74,16 @@ export async function usarCodigo(
 export async function listarTodosLosCodigos(): Promise<Codigo[]> {
   const ids = await redis.smembers(SET_CODIGOS);
   if (!ids || ids.length === 0) return [];
+
+  const keys = (ids as string[]).map((id) => `${PREFIJO_CODIGO}${id}`);
+  const resultados = await redis.mget<string[]>(...keys);
+
   const codigos: Codigo[] = [];
-  for (const id of ids) {
-    const key = `${PREFIJO_CODIGO}${id}`;
-    const datos = await redis.get<string>(key);
-    if (datos) {
-      codigos.push(
-        typeof datos === "string" ? JSON.parse(datos) : (datos as Codigo)
-      );
+  for (const dato of resultados) {
+    if (dato) {
+      try {
+        codigos.push(typeof dato === "string" ? JSON.parse(dato) : dato as unknown as Codigo);
+      } catch { /* ignorar entradas corruptas */ }
     }
   }
   return codigos.sort((a, b) => b.creadoEn - a.creadoEn);
