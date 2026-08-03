@@ -1,11 +1,1 @@
-﻿{
-  "regions": ["gru1"],
-  "functions": {
-    "app/api/auth/**/*.ts": {
-      "maxDuration": 30
-    },
-    "app/api/**/*.ts": {
-      "maxDuration": 15
-    }
-  }
-}
+﻿{"regions":["gru1"],"functions":{"app/api/**/*.ts":{"maxDuration":30}}}
