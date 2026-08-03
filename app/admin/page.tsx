@@ -63,14 +63,9 @@ type PlanData = {
 export default function PanelAdmin() {
   const [clave, setClave] = useState("");
   const [autenticado, setAutenticado] = useState(false);
+  const [validandoSesion, setValidandoSesion] = useState(true);
   const [claveIngresada, setClaveIngresada] = useState("");
   const [error, setError] = useState("");
-
-  // WhatsApp OTP state
-  const [otpEnviado, setOtpEnviado] = useState(false);
-  const [codigoOtp, setCodigoOtp] = useState("");
-  const [enviandoOtp, setEnviandoOtp] = useState(false);
-  const [verificandoOtp, setVerificandoOtp] = useState(false);
   const [resumen, setResumen] = useState<ResumenData | null>(null);
   const [pagos, setPagos] = useState<PagoData[]>([]);
   const [codigos, setCodigos] = useState<CodigoData[]>([]);
@@ -142,71 +137,50 @@ export default function PanelAdmin() {
     } finally { setGuardandoConfig(false); }
   }
 
-  async function solicitarOtp() {
-    setEnviandoOtp(true);
-    setError("");
-    try {
-      const r = await fetch("/api/auth/whatsapp-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "solicitar" }),
-      });
-      const d = await r.json();
-      if (r.ok) {
-        setOtpEnviado(true);
-      } else {
-        setError(d.error ?? "Error enviando código");
-      }
-    } finally {
-      setEnviandoOtp(false);
-    }
+  async function cargarPanelConClave(claveAdmin: string) {
+    const r = await fetch("/api/admin-dashboard", { headers: { "x-admin-key": claveAdmin } });
+    if (!r.ok) return false;
+    const d = await r.json();
+    setClave(claveAdmin);
+    setAutenticado(true);
+    setResumen(d.resumen);
+    setPagos(d.pagos);
+    setCodigos(d.codigos);
+    cargarConfig();
+    cargarPaquetes(claveAdmin);
+    return true;
   }
 
-  async function verificarOtp() {
-    setVerificandoOtp(true);
+  async function iniciarGoogle() {
+    setError("");
+    window.location.href = "/api/auth/signin/google?callbackUrl=/admin";
+  }
+
+  async function cerrarSesionGoogle() {
+    setAutenticado(false);
+    setClave("");
+    window.location.href = "/api/auth/signout?callbackUrl=/admin";
+  }
+
+  async function verificarSesionGoogle() {
     setError("");
     try {
-      const r = await fetch("/api/auth/whatsapp-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "verificar", codigo: codigoOtp }),
-      });
+      const r = await fetch("/api/admin-token");
       const d = await r.json();
       if (r.ok && d.token) {
-        setClave(d.token);
-        const rd = await fetch("/api/admin-dashboard", { headers: { "x-admin-key": d.token } });
-        if (rd.ok) {
-          const data = await rd.json();
-          setAutenticado(true);
-          setResumen(data.resumen);
-          setPagos(data.pagos);
-          setCodigos(data.codigos);
-          cargarConfig();
-          cargarPaquetes(d.token);
-        } else {
-          setError("Error cargando el panel");
-        }
-      } else {
-        setError(d.error ?? "Código incorrecto");
+        await cargarPanelConClave(d.token);
+      } else if (r.status !== 401) {
+        setError(d.error ?? "No se pudo validar la sesión");
       }
     } finally {
-      setVerificandoOtp(false);
+      setValidandoSesion(false);
     }
   }
 
   async function ingresar() {
     setError("");
-    const r = await fetch("/api/admin-dashboard", { headers: { "x-admin-key": claveIngresada } });
-    if (r.ok) {
-      const d = await r.json();
-      setClave(claveIngresada);
-      setAutenticado(true);
-      setResumen(d.resumen);
-      setPagos(d.pagos);
-      setCodigos(d.codigos);
-      cargarConfig();
-      cargarPaquetes(claveIngresada);
-    } else {
+    const ok = await cargarPanelConClave(claveIngresada);
+    if (!ok) {
       setError("Clave incorrecta");
     }
   }
@@ -276,6 +250,14 @@ export default function PanelAdmin() {
   }
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("error") === "AccessDenied") {
+      setError("Tu cuenta de Google no tiene permisos de administrador.");
+    }
+    verificarSesionGoogle();
+  }, []);
+
+  useEffect(() => {
     if (autenticado && clave) {
       const i = setInterval(() => cargarDatos(clave), 30000);
       return () => clearInterval(i);
@@ -310,48 +292,13 @@ export default function PanelAdmin() {
           </div>
           <p className="text-white text-center text-lg font-medium mb-6">Panel WAIFAI</p>
 
-          {/* Telegram OTP */}
-          {!otpEnviado ? (
-            <button
-              onClick={solicitarOtp}
-              disabled={enviandoOtp}
-              className="w-full py-3 rounded-xl bg-[#229ED9] text-white font-medium mb-4 flex items-center justify-center gap-2 hover:bg-[#1a8bbf] transition disabled:opacity-50"
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
-              </svg>
-              {enviandoOtp ? "Enviando..." : "Recibir código por Telegram"}
-            </button>
-          ) : (
-            <div className="mb-4">
-              <p className="text-[#A0A0A8] text-sm text-center mb-3">
-                ✈️ Código enviado por Telegram. Ingresalo acá:
-              </p>
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
-                value={codigoOtp}
-                onChange={(e) => setCodigoOtp(e.target.value.replace(/\D/g, ""))}
-                onKeyDown={(e) => e.key === "Enter" && codigoOtp.length === 6 && verificarOtp()}
-                placeholder="123456"
-                className="w-full px-4 py-3 rounded-xl bg-[#18181B] border border-[#2A2A2E] text-white text-center text-2xl tracking-widest mb-3"
-              />
-              <button
-                onClick={verificarOtp}
-                disabled={verificandoOtp || codigoOtp.length !== 6}
-                className="w-full py-3 rounded-xl bg-[#229ED9] text-white font-medium disabled:opacity-50"
-              >
-                {verificandoOtp ? "Verificando..." : "Ingresar"}
-              </button>
-              <button
-                onClick={() => { setOtpEnviado(false); setCodigoOtp(""); setError(""); }}
-                className="w-full mt-2 text-[#5A5A60] text-xs text-center"
-              >
-                Volver / Reenviar código
-              </button>
-            </div>
-          )}
+          <button
+            onClick={iniciarGoogle}
+            disabled={validandoSesion}
+            className="w-full py-3 rounded-xl bg-white text-black font-medium mb-4 hover:bg-gray-200 transition disabled:opacity-50"
+          >
+            {validandoSesion ? "Verificando sesión..." : "Ingresar con Google"}
+          </button>
 
           <div className="flex items-center gap-3 mb-4">
             <div className="flex-1 h-px bg-[#2A2A2E]" />
@@ -391,8 +338,11 @@ export default function PanelAdmin() {
             </div>
             <p className="text-white font-medium">Panel WAIFAI</p>
           </div>
-          <button onClick={() => { cargarDatos(clave); if (tab === "dispositivos") cargarDispositivos(clave); }}
-            className="text-[#8B5FBF] text-sm underline">Actualizar</button>
+          <div className="flex items-center gap-3">
+            <button onClick={() => { cargarDatos(clave); if (tab === "dispositivos") cargarDispositivos(clave); }}
+              className="text-[#8B5FBF] text-sm underline">Actualizar</button>
+            <button onClick={cerrarSesionGoogle} className="text-[#A0A0A8] text-sm underline">Salir</button>
+          </div>
         </div>
 
         <div className="flex gap-2 mb-6 overflow-x-auto pb-1">

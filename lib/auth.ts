@@ -1,7 +1,7 @@
 import type { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 
-function esAdminEmail(email: string | null | undefined): boolean {
+export function esAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;
   const admins = (process.env.ADMIN_EMAILS ?? "")
     .split(",")
