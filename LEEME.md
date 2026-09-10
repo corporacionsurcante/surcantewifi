@@ -105,6 +105,31 @@ Archivos relevantes:
 - `app/ventanillas-imprimir/page.tsx` — vista imprimible de los carteles QR
 - `app/qr/page.tsx` — cartel QR para conectarse al WiFi (paso previo al pago)
 
+## Login del panel admin
+
+El panel `/admin` se protege con dos métodos, ambos habilitados al
+mismo tiempo:
+
+1. **Google** (recomendado): botón "Ingresar con Google". Requiere estas
+   variables de entorno en Vercel:
+   - `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` (credenciales OAuth de
+     Google Cloud Console, con `https://TU-DOMINIO/api/auth/callback/google`
+     agregado como "Authorized redirect URI").
+   - `ADMIN_EMAILS`: lista de emails autorizados separados por coma
+     (por ejemplo `persona1@gmail.com,persona2@gmail.com`). Solo esas
+     cuentas de Google pueden entrar; cualquier otra cuenta es rechazada.
+   - `NEXTAUTH_URL`: la URL pública del sitio (por ejemplo
+     `https://tudominio.com`).
+   - `NEXTAUTH_SECRET`: una cadena aleatoria larga (podés generarla con
+     `openssl rand -base64 32`), usada para firmar las sesiones.
+
+   Si `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` no están configurados,
+   el botón de Google simplemente no va a funcionar (NextAuth queda sin
+   provider), pero el resto del panel sigue funcionando con la clave.
+
+2. **Clave manual** (`CLAVE_ADMIN`): siempre disponible como respaldo,
+   por si Google no está configurado o falla.
+
 ## Estructura del proyecto
 
 - `app/page.tsx` — la pantalla principal que ve el pasajero
