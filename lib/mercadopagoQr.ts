@@ -19,12 +19,12 @@
 // Pro; no hace falta un token distinto.
 //
 // Variable opcional:
-//   MERCADOPAGO_POS_CATEGORY → código de rubro (MCC) que Mercado
-//   Pago pide al crear una caja. Si no se configura, se usa 5541
-//   ("estaciones de servicio / transporte"), un valor genérico.
-//   Si Mercado Pago lo rechaza al generar ventanillas nuevas desde
-//   el panel admin, se ve el motivo exacto en el error y se puede
-//   ajustar esta variable con el código correcto para la cuenta.
+//   MERCADOPAGO_POS_CATEGORY → código de rubro (MCC) a usar al crear
+//   una caja. Por defecto NO se envía (Mercado Pago la deja sin
+//   categoría), porque los valores válidos no están documentados
+//   públicamente y enviar uno inventado causa el error
+//   "pos_unknown_mcc". Solo configurar esta variable si Mercado
+//   Pago Soporte confirma el código correcto para la cuenta.
 //
 // Variables opcionales (dirección fiscal de la sucursal): Mercado
 // Pago exige una ubicación física para crear la "sucursal" aunque
@@ -160,7 +160,14 @@ export async function crearVentanillaPos(
   const storeId = await obtenerOCrearTienda();
   const externalId = `surcante-ventanilla-${numero}`;
   const nombre = `Ventanilla ${numero}`;
-  const categoria = Number(process.env.MERCADOPAGO_POS_CATEGORY || "5541");
+  // El código de rubro (MCC) es opcional para Mercado Pago y sus
+  // valores válidos no están documentados públicamente; enviar uno
+  // inventado (como el 5541 que se usaba antes) provoca el error
+  // "pos_unknown_mcc". Por eso solo se envía si se configuró
+  // explícitamente un valor correcto para la cuenta.
+  const categoria = process.env.MERCADOPAGO_POS_CATEGORY
+    ? Number(process.env.MERCADOPAGO_POS_CATEGORY)
+    : undefined;
 
   const respuesta = await fetch(`${MP_API}/pos`, {
     method: "POST",
@@ -170,7 +177,7 @@ export async function crearVentanillaPos(
       fixed_amount: false,
       store_id: Number(storeId),
       external_id: externalId,
-      category: categoria,
+      ...(categoria !== undefined ? { category: categoria } : {}),
     }),
   });
   const datos = await respuesta.json();
