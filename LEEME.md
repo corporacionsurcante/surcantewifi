@@ -75,6 +75,36 @@ recibe la confirmación por webhook. Lo que falta es el último paso:
    `lib/pagos.ts`) a una base de datos persistente antes de confiar
    en esto para operación real con muchos buses.
 
+## Pago con QR fijo en la ventanilla (Mercado Pago Point/QR en tienda)
+
+Además del pago por Checkout Pro (redirigiendo a Mercado Pago) y por
+WhatsApp, existe un tercer medio de pago: un QR dinámico de Mercado
+Pago pegado físicamente en cada ventanilla del ómnibus. El pasajero
+se conecta primero al WiFi (vía Omada), abre la app de Mercado Pago,
+escanea el QR de su ventanilla y paga; al confirmarse el pago se lo
+conecta automáticamente a internet, sin salir de la app de Mercado Pago.
+
+Podés activar/desactivar este medio de pago (junto con Nave/Galicia,
+Checkout Pro y WhatsApp) desde `/admin`, pestaña "Config".
+
+Configuración necesaria:
+- Variable de entorno `MERCADOPAGO_POS_CATEGORY` (opcional): categoría de
+  punto de venta a usar al crear los QR de las ventanillas en Mercado
+  Pago. Si no se define, se usa la categoría por defecto de la cuenta.
+- Desde `/admin`, pestaña "Ventanillas", generás una ventanilla nueva
+  (un punto de cobro independiente) por cada QR físico que vayas a
+  imprimir y pegar, y desde ahí abrís `/ventanillas-imprimir` para
+  imprimirlos todos juntos.
+
+Archivos relevantes:
+- `lib/ventanillas.ts` — almacenamiento (Redis) de las ventanillas/POS
+- `lib/mercadopagoQr.ts` — integración con la API de QR en tienda de Mercado Pago
+- `app/api/admin-ventanillas/route.ts` — alta y listado de ventanillas (protegido por CLAVE_ADMIN)
+- `app/api/ventanillas-publica/route.ts` — lista pública de números de ventanilla disponibles
+- `app/api/crear-pago-qr/route.ts` — genera el pago dinámico sobre una ventanilla elegida
+- `app/ventanillas-imprimir/page.tsx` — vista imprimible de los carteles QR
+- `app/qr/page.tsx` — cartel QR para conectarse al WiFi (paso previo al pago)
+
 ## Estructura del proyecto
 
 - `app/page.tsx` — la pantalla principal que ve el pasajero

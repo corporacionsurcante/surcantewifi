@@ -14,7 +14,8 @@ export type PagoPendiente = {
   creadoEn: number;
   confirmadoEn: number | null;
   monto?: number;
-  procesador?: "mp" | "nave";
+  procesador?: "mp" | "nave" | "mp-qr";
+  ventanilla?: number;
 };
 
 const PREFIJO_PAGO = "pago:";

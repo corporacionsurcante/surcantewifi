@@ -8,12 +8,14 @@ export type ConfigMediosPago = {
   nave: boolean;
   mp: boolean;
   whatsapp: boolean;
+  qrVentanilla: boolean;
 };
 
 const CONFIG_DEFAULT: ConfigMediosPago = {
   nave: true,
   mp: true,
   whatsapp: true,
+  qrVentanilla: true,
 };
 
 function verificarAdmin(solicitud: NextRequest): boolean {

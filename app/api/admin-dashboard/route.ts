@@ -58,6 +58,7 @@ export async function GET(solicitud: NextRequest) {
       plan: PLANES.find((pl) => pl.id === p.planId)?.nombre ?? p.planId,
       monto: p.monto ?? PLANES.find((pl) => pl.id === p.planId)?.precio ?? 0,
       procesador: p.procesador ?? "mp",
+      ventanilla: p.ventanilla ?? null,
       fechaPago: p.confirmadoEn,
       duracionMinutos: p.duracionMinutos,
     })),

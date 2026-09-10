@@ -16,6 +16,7 @@ type PagoData = {
   plan: string;
   monto: number;
   procesador: string;
+  ventanilla: number | null;
   fechaPago: number;
   duracionMinutos: number;
 };
@@ -60,6 +61,15 @@ type PlanData = {
   actualizadoEn?: number;
 };
 
+type VentanillaData = {
+  numero: number;
+  externalId: string;
+  posId: number;
+  nombre: string;
+  qrImageUrl: string;
+  creadoEn: number;
+};
+
 export default function PanelAdmin() {
   const [clave, setClave] = useState("");
   const [autenticado, setAutenticado] = useState(false);
@@ -77,14 +87,19 @@ export default function PanelAdmin() {
   const [aps, setAps] = useState<APData[]>([]);
   const [clientes, setClientes] = useState<ClienteData[]>([]);
   const [planes, setPlanes] = useState<PlanData[]>([]);
-  const [tab, setTab] = useState<"resumen" | "pagos" | "codigos" | "dispositivos" | "paquetes" | "config">("resumen");
+  const [tab, setTab] = useState<"resumen" | "pagos" | "codigos" | "dispositivos" | "paquetes" | "ventanillas" | "config">("resumen");
   const [generando, setGenerando] = useState(false);
   const [cantidadCodigos, setCantidadCodigos] = useState(1);
   const [creadoPor, setCreadoPor] = useState("");
-  const [config, setConfig] = useState({ nave: true, mp: true, whatsapp: true });
+  const [config, setConfig] = useState({ nave: true, mp: true, whatsapp: true, qrVentanilla: true });
   const [guardandoConfig, setGuardandoConfig] = useState(false);
   const [cargandoDispositivos, setCargandoDispositivos] = useState(false);
   const [cargandoPaquetes, setCargandoPaquetes] = useState(false);
+  const [ventanillas, setVentanillas] = useState<VentanillaData[]>([]);
+  const [cargandoVentanillas, setCargandoVentanillas] = useState(false);
+  const [generandoVentanillas, setGenerandoVentanillas] = useState(false);
+  const [cantidadVentanillas, setCantidadVentanillas] = useState(1);
+  const [errorVentanillas, setErrorVentanillas] = useState<string | null>(null);
   const [editandoPlan, setEditandoPlan] = useState<PlanData | null>(null);
   const [guardandoPlan, setGuardandoPlan] = useState(false);
   const [nuevoNombre, setNuevoNombre] = useState("");
@@ -124,6 +139,38 @@ export default function PanelAdmin() {
     } catch (e) { console.error(e); }
     finally { setCargandoPaquetes(false); }
   }, []);
+
+  const cargarVentanillas = useCallback(async (claveAdmin: string) => {
+    setCargandoVentanillas(true);
+    try {
+      const r = await fetch("/api/admin-ventanillas", { headers: { "x-admin-key": claveAdmin } });
+      const d = await r.json();
+      setVentanillas(d.ventanillas ?? []);
+    } catch (e) { console.error(e); }
+    finally { setCargandoVentanillas(false); }
+  }, []);
+
+  async function generarVentanillas() {
+    setGenerandoVentanillas(true);
+    setErrorVentanillas(null);
+    try {
+      const r = await fetch("/api/admin-ventanillas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-key": clave },
+        body: JSON.stringify({ cantidad: cantidadVentanillas }),
+      });
+      const d = await r.json();
+      if (d.errores?.length) {
+        setErrorVentanillas(d.errores[0]);
+      }
+      await cargarVentanillas(clave);
+    } catch (e) {
+      console.error(e);
+      setErrorVentanillas("No se pudo conectar con el servidor");
+    } finally {
+      setGenerandoVentanillas(false);
+    }
+  }
 
   async function cargarConfig() {
     const r = await fetch("/api/config-publica");
@@ -296,6 +343,12 @@ export default function PanelAdmin() {
     }
   }, [tab, autenticado, clave, cargarPaquetes]);
 
+  useEffect(() => {
+    if (tab === "ventanillas" && autenticado) {
+      cargarVentanillas(clave);
+    }
+  }, [tab, autenticado, clave, cargarVentanillas]);
+
   const formatPeso = (n: number) => "$" + n.toLocaleString("es-AR");
   const formatFecha = (ts: number) => new Date(ts).toLocaleString("es-AR", {
     day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit",
@@ -375,9 +428,9 @@ export default function PanelAdmin() {
     );
   }
 
-  const TABS = ["resumen", "dispositivos", "pagos", "codigos", "paquetes", "config"] as const;
+  const TABS = ["resumen", "dispositivos", "pagos", "codigos", "paquetes", "ventanillas", "config"] as const;
   const LABELS: Record<string, string> = {
-    resumen: "Resumen", dispositivos: "Buses", pagos: "Pagos", codigos: "Códigos", paquetes: "Paquetes", config: "Config"
+    resumen: "Resumen", dispositivos: "Buses", pagos: "Pagos", codigos: "Códigos", paquetes: "Paquetes", ventanillas: "Ventanillas", config: "Config"
   };
 
   return (
@@ -391,8 +444,13 @@ export default function PanelAdmin() {
             </div>
             <p className="text-white font-medium">Panel WAIFAI</p>
           </div>
-          <button onClick={() => { cargarDatos(clave); if (tab === "dispositivos") cargarDispositivos(clave); }}
-            className="text-[#8B5FBF] text-sm underline">Actualizar</button>
+          <div className="flex items-center gap-4">
+            <a href="/qr" target="_blank" rel="noopener noreferrer" className="text-[#8B5FBF] text-sm underline">
+              Cartel QR
+            </a>
+            <button onClick={() => { cargarDatos(clave); if (tab === "dispositivos") cargarDispositivos(clave); }}
+              className="text-[#8B5FBF] text-sm underline">Actualizar</button>
+          </div>
         </div>
 
         <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
@@ -508,7 +566,13 @@ export default function PanelAdmin() {
                 <div className="flex justify-between items-start mb-2">
                   <div>
                     <p className="text-white text-sm font-medium">{p.plan}</p>
-                    <p className="text-[#A0A0A8] text-xs">{p.procesador === "nave" ? "Nave/Galicia" : "Mercado Pago"}</p>
+                    <p className="text-[#A0A0A8] text-xs">
+                      {p.procesador === "nave"
+                        ? "Nave/Galicia"
+                        : p.procesador === "mp-qr"
+                        ? `QR ventanilla${p.ventanilla ? " " + p.ventanilla : ""}`
+                        : "Mercado Pago"}
+                    </p>
                   </div>
                   <p className="text-white font-medium">{formatPeso(p.monto)}</p>
                 </div>
@@ -705,6 +769,63 @@ export default function PanelAdmin() {
           </div>
         )}
 
+        {tab === "ventanillas" && (
+          <div className="flex flex-col gap-4">
+            <div className="bg-[#18181B] border border-[#2A2A2E] rounded-2xl p-4">
+              <p className="text-[#A0A0A8] text-xs mb-1">QR de pago para pegar en cada ventanilla</p>
+              <p className="text-[#5A5A60] text-xs mb-3">
+                Cada ventanilla es un punto de cobro independiente en Mercado Pago:
+                dos pasajeros pueden escanear y pagar al mismo tiempo sin pisarse.
+                Generá una por cada QR físico que vayas a imprimir y pegar.
+              </p>
+              <div className="flex gap-2">
+                <input type="number" value={cantidadVentanillas}
+                  onChange={(e) => setCantidadVentanillas(Math.min(60, Math.max(1, Number(e.target.value))))}
+                  min={1} max={60}
+                  className="w-20 px-3 py-2.5 rounded-xl bg-[#0A0A0C] border border-[#2A2A2E] text-white text-sm"
+                />
+                <button onClick={generarVentanillas} disabled={generandoVentanillas}
+                  className="flex-1 py-2.5 rounded-xl bg-[#6E3FA3] text-white text-sm font-medium disabled:opacity-60">
+                  {generandoVentanillas ? "Generando..." : `Generar ${cantidadVentanillas} ventanilla${cantidadVentanillas > 1 ? "s" : ""} nueva${cantidadVentanillas > 1 ? "s" : ""}`}
+                </button>
+              </div>
+              {errorVentanillas && (
+                <p className="text-red-400 text-xs mt-2">{errorVentanillas}</p>
+              )}
+            </div>
+
+            {ventanillas.length > 0 && (
+              <a
+                href={`/ventanillas-imprimir?clave=${encodeURIComponent(clave)}`}
+                target="_blank" rel="noopener noreferrer"
+                className="text-center text-[#8B5FBF] text-sm underline"
+              >
+                Abrir todas para imprimir →
+              </a>
+            )}
+
+            {cargandoVentanillas ? (
+              <p className="text-[#A0A0A8] text-center py-8">Cargando...</p>
+            ) : ventanillas.length === 0 ? (
+              <p className="text-[#A0A0A8] text-center py-8">Todavía no generaste ninguna ventanilla</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                {ventanillas.map((v) => (
+                  <div key={v.numero} className="bg-[#18181B] border border-[#2A2A2E] rounded-2xl p-3 text-center">
+                    <p className="text-white text-sm font-medium mb-2">Ventanilla {v.numero}</p>
+                    {v.qrImageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={v.qrImageUrl} alt={`QR ventanilla ${v.numero}`} className="w-full rounded-lg bg-white p-1" />
+                    ) : (
+                      <p className="text-[#5A5A60] text-xs">Sin imagen</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {tab === "config" && (
           <div className="bg-[#18181B] border border-[#2A2A2E] rounded-2xl p-4 flex flex-col gap-4">
             <p className="text-[#A0A0A8] text-xs">Medios de pago activos en la landing</p>
@@ -712,6 +833,7 @@ export default function PanelAdmin() {
               { key: "nave", label: "Nave / Galicia" },
               { key: "mp", label: "Mercado Pago" },
               { key: "whatsapp", label: "WhatsApp" },
+              { key: "qrVentanilla", label: "QR pegado en la ventanilla" },
             ].map(({ key, label }) => (
               <div key={key} className="flex items-center justify-between">
                 <p className="text-white text-sm">{label}</p>
