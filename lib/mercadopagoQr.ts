@@ -43,7 +43,7 @@ import { Redis } from "@upstash/redis";
 const redis = Redis.fromEnv();
 
 const MP_API = "https://api.mercadopago.com";
-const EXTERNAL_ID_TIENDA = "surcante-flota";
+const EXTERNAL_ID_TIENDA = "surcanteflota";
 
 function encabezados() {
   return {
@@ -158,7 +158,10 @@ export async function crearVentanillaPos(
   numero: number
 ): Promise<VentanillaCreada> {
   const storeId = await obtenerOCrearTienda();
-  const externalId = `surcante-ventanilla-${numero}`;
+  // Mercado Pago exige que external_id sea alfanumérico (sin
+  // guiones ni otros símbolos) o rechaza la creación con
+  // "invalid_external_id".
+  const externalId = `surcanteventanilla${numero}`;
   const nombre = `Ventanilla ${numero}`;
   // El código de rubro (MCC) es opcional para Mercado Pago y sus
   // valores válidos no están documentados públicamente; enviar uno
