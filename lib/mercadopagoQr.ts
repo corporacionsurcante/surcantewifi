@@ -29,8 +29,10 @@
 // Variables opcionales (dirección fiscal de la sucursal): Mercado
 // Pago exige una ubicación física para crear la "sucursal" aunque
 // las ventanillas estén en un ómnibus. Por defecto se usa la
-// dirección de Surcante (Av. General Paz 12235, Lomas del Mirador,
-// Buenos Aires). Si cambia el domicilio, se puede sobreescribir con:
+// dirección de Surcante (Av. General Paz 12235, partido de La
+// Matanza, Buenos Aires — Mercado Pago valida city_name contra su
+// propia lista de partidos/localidades, no acepta cualquier texto).
+// Si cambia el domicilio, se puede sobreescribir con:
 //   MERCADOPAGO_STORE_STREET_NUMBER, MERCADOPAGO_STORE_STREET_NAME,
 //   MERCADOPAGO_STORE_CITY, MERCADOPAGO_STORE_STATE,
 //   MERCADOPAGO_STORE_LAT, MERCADOPAGO_STORE_LON
@@ -93,7 +95,7 @@ export async function obtenerOCrearTienda(): Promise<string> {
   const location = {
     street_number: process.env.MERCADOPAGO_STORE_STREET_NUMBER || "12235",
     street_name: process.env.MERCADOPAGO_STORE_STREET_NAME || "Avenida General Paz",
-    city_name: process.env.MERCADOPAGO_STORE_CITY || "Lomas del Mirador",
+    city_name: process.env.MERCADOPAGO_STORE_CITY || "La Matanza",
     state_name: process.env.MERCADOPAGO_STORE_STATE || "Buenos Aires",
     latitude: Number(process.env.MERCADOPAGO_STORE_LAT || "-34.6579926"),
     longitude: Number(process.env.MERCADOPAGO_STORE_LON || "-58.5244947"),

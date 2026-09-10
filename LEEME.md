@@ -93,7 +93,9 @@ Configuración necesaria:
   Pago. Si no se define, se usa la categoría por defecto de la cuenta.
 - Mercado Pago exige una dirección física para crear la "sucursal" donde
   viven las ventanillas (aunque en realidad estén en un ómnibus). Por
-  defecto se usa Av. General Paz 12235, Lomas del Mirador, Buenos Aires.
+  defecto se usa Av. General Paz 12235, partido de La Matanza, Buenos
+  Aires (Mercado Pago valida `city_name` contra su propia lista cerrada
+  de partidos/localidades, no acepta cualquier texto).
   Si hace falta cambiarla, se puede sobreescribir con estas variables
   (todas opcionales): `MERCADOPAGO_STORE_STREET_NUMBER`,
   `MERCADOPAGO_STORE_STREET_NAME`, `MERCADOPAGO_STORE_CITY`,
