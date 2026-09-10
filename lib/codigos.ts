@@ -76,15 +76,15 @@ export async function usarCodigo(
 export async function listarTodosLosCodigos(): Promise<Codigo[]> {
   const ids = await redis.smembers(SET_CODIGOS);
   if (!ids || ids.length === 0) return [];
+  const keys = ids.map((id) => `${PREFIJO_CODIGO}${id}`);
+  // Un solo round-trip a Redis (mget) en vez de uno por cada código:
+  // con muchos códigos acumulados, N llamadas secuenciales superaban
+  // el límite de tiempo de la función serverless (504 timeout).
+  const valores = await redis.mget<(string | Codigo | null)[]>(...keys);
   const codigos: Codigo[] = [];
-  for (const id of ids) {
-    const key = `${PREFIJO_CODIGO}${id}`;
-    const datos = await redis.get<string>(key);
-    if (datos) {
-      codigos.push(
-        typeof datos === "string" ? JSON.parse(datos) : (datos as Codigo)
-      );
-    }
+  for (const datos of valores) {
+    if (!datos) continue;
+    codigos.push(typeof datos === "string" ? JSON.parse(datos) : datos);
   }
   return codigos.sort((a, b) => b.creadoEn - a.creadoEn);
 }

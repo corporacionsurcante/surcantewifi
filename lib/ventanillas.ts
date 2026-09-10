@@ -40,10 +40,12 @@ export async function buscarVentanilla(
 export async function listarVentanillas(): Promise<Ventanilla[]> {
   const ids = await redis.smembers(SET_VENTANILLAS);
   if (!ids || ids.length === 0) return [];
+  const keys = ids.map((id) => `${PREFIJO_VENTANILLA}${id}`);
+  const valores = await redis.mget<(string | Ventanilla | null)[]>(...keys);
   const ventanillas: Ventanilla[] = [];
-  for (const id of ids) {
-    const ventanilla = await buscarVentanilla(Number(id));
-    if (ventanilla) ventanillas.push(ventanilla);
+  for (const datos of valores) {
+    if (!datos) continue;
+    ventanillas.push(typeof datos === "string" ? JSON.parse(datos) : datos);
   }
   return ventanillas.sort((a, b) => a.numero - b.numero);
 }

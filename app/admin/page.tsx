@@ -342,7 +342,7 @@ export default function PanelAdmin() {
       window.history.replaceState({}, "", "/admin");
     }
 
-    fetch("/api/auth/admin-session-token")
+    fetch("/api/admin-token")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d?.token) solicitarSesionGoogle(d.token);
