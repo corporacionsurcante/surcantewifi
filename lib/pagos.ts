@@ -14,7 +14,8 @@ export type PagoPendiente = {
   creadoEn: number;
   confirmadoEn: number | null;
   monto?: number;
-  procesador?: "mp" | "nave";
+  procesador?: "mp" | "nave" | "mp-qr";
+  ventanilla?: number;
 };
 
 const PREFIJO_PAGO = "pago:";
@@ -56,10 +57,15 @@ export async function marcarPagoConfirmado(preferenciaId: string): Promise<void>
 export async function listarTodosLosPagos(): Promise<PagoPendiente[]> {
   const ids = await redis.smembers(SET_PAGOS);
   if (!ids || ids.length === 0) return [];
+  const keys = ids.map((id) => `${PREFIJO_PAGO}${id}`);
+  // Un solo round-trip a Redis (mget) en vez de uno por cada pago:
+  // con muchos pagos acumulados, N llamadas secuenciales superaban
+  // el límite de tiempo de la función serverless (504 timeout).
+  const valores = await redis.mget<(string | PagoPendiente | null)[]>(...keys);
   const pagos: PagoPendiente[] = [];
-  for (const id of ids) {
-    const pago = await buscarPago(id as string);
-    if (pago) pagos.push(pago);
+  for (const datos of valores) {
+    if (!datos) continue;
+    pagos.push(typeof datos === "string" ? JSON.parse(datos) : datos);
   }
   return pagos.sort((a, b) => b.creadoEn - a.creadoEn);
 }

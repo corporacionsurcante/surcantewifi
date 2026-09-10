@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PLANES_PREDETERMINADOS, Plan } from "@/lib/planes";
 
@@ -16,7 +16,7 @@ function ContenidoPortal() {
   const parametros = useSearchParams();
   const [planes, setPlanes] = useState<Plan[]>(PLANES_PREDETERMINADOS);
   const [planSeleccionado, setPlanSeleccionado] = useState(PLANES_PREDETERMINADOS[1].id);
-  const [cargando, setCargando] = useState<"mp" | "nave" | "whatsapp" | null>(null);
+  const [cargando, setCargando] = useState<"mp" | "nave" | "whatsapp" | "qr" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [verificando, setVerificando] = useState(true);
   const [accesoAutomatico, setAccesoAutomatico] = useState(false);
@@ -38,7 +38,14 @@ function ContenidoPortal() {
   const [canjeando, setCanjeando] = useState(false);
 
   const [macDePrueba, setMacDePrueba] = useState("");
-  const [config, setConfig] = useState({ nave: true, mp: true, whatsapp: true });
+  const [config, setConfig] = useState({ nave: true, mp: true, whatsapp: true, qrVentanilla: true });
+
+  // --- Pago con el QR fijo pegado en la ventanilla (Mercado Pago) ---
+  const [ventanillasDisponibles, setVentanillasDisponibles] = useState<number[]>([]);
+  const [mostrarSelectorVentanilla, setMostrarSelectorVentanilla] = useState(false);
+  const [ventanillaSeleccionada, setVentanillaSeleccionada] = useState<number | null>(null);
+  const [esperandoPagoQr, setEsperandoPagoQr] = useState(false);
+  const intervaloVerificacionRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const macCliente = parametros.get("clientMac") || macDePrueba;
   const macAp = parametros.get("apMac") ?? "";
@@ -78,6 +85,12 @@ function ContenidoPortal() {
     fetch("/api/config-publica")
       .then((r) => r.json())
       .then((datos) => setConfig(datos))
+      .catch(() => {});
+
+    // Carga números de ventanilla disponibles para pagar con el QR fijo
+    fetch("/api/ventanillas-publica")
+      .then((r) => r.json())
+      .then((datos) => setVentanillasDisponibles(datos.numeros ?? []))
       .catch(() => {});
   }, []);
 
@@ -162,6 +175,14 @@ function ContenidoPortal() {
       setConsultandoPago(false);
     };
   }, [pagoPendiente]);
+
+  // Deja de sondear el acceso si el componente se desmonta con el
+  // pago por QR de ventanilla todavía esperando confirmación.
+  useEffect(() => {
+    return () => {
+      if (intervaloVerificacionRef.current) clearInterval(intervaloVerificacionRef.current);
+    };
+  }, []);
 
   function abrirPagoEnNavegadorExterno(url: string) {
     if (esCNA) {
@@ -304,6 +325,72 @@ function ContenidoPortal() {
     }
   }
 
+  // --- Pago con el QR fijo pegado en la ventanilla ---
+  async function verificarAccesoAhora(): Promise<boolean> {
+    try {
+      const respuesta = await fetch("/api/verificar-acceso", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientMac: macCliente,
+          apMac: macAp,
+          ssidName: nombreSsid,
+          site: nombreSitio,
+        }),
+      });
+      const datos = await respuesta.json();
+      return !!datos.tieneAcceso;
+    } catch {
+      return false;
+    }
+  }
+
+  async function pagarConVentanilla() {
+    if (!ventanillaSeleccionada) return;
+    setError(null);
+    setCargando("qr");
+
+    try {
+      const respuesta = await fetch("/api/crear-pago-qr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          planId: planSeleccionado,
+          numeroVentanilla: ventanillaSeleccionada,
+          clientMac: macCliente,
+          apMac: macAp,
+          redirectUrl: urlRedireccion,
+          ssidName: nombreSsid,
+          site: nombreSitio,
+        }),
+      });
+      const datos = await respuesta.json();
+      if (!respuesta.ok || !datos.ok) {
+        throw new Error(datos.error ?? "No se pudo preparar el cobro");
+      }
+
+      setEsperandoPagoQr(true);
+      intervaloVerificacionRef.current = setInterval(async () => {
+        const tieneAcceso = await verificarAccesoAhora();
+        if (tieneAcceso) {
+          if (intervaloVerificacionRef.current) clearInterval(intervaloVerificacionRef.current);
+          window.location.href = urlRedireccion || `/pagado?plan=${encodeURIComponent(planSeleccionado)}`;
+        }
+      }, 4000);
+    } catch (e) {
+      console.error("[pagarConVentanilla] error:", e);
+      setError("Hubo un problema al preparar el cobro. Probá de nuevo.");
+    } finally {
+      setCargando(null);
+    }
+  }
+
+  function cancelarPagoQr() {
+    if (intervaloVerificacionRef.current) clearInterval(intervaloVerificacionRef.current);
+    setEsperandoPagoQr(false);
+    setVentanillaSeleccionada(null);
+  }
+
   async function canjearCodigo() {
     setErrorCodigo(null);
     setCanjeando(true);
@@ -354,6 +441,32 @@ function ContenidoPortal() {
           </div>
           <p className="text-white text-xl font-medium mb-2">¡Bienvenido de vuelta!</p>
           <p className="text-[#A0A0A8] text-sm">Tu acceso sigue activo. Conectando...</p>
+        </div>
+      </main>
+    );
+  }
+
+  // Pantalla de espera mientras se confirma el pago con el QR de la ventanilla
+  if (esperandoPagoQr) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center px-5 bg-[#0A0A0C]">
+        <div className="text-center max-w-xs">
+          <div className="w-16 h-16 rounded-full bg-[#6E3FA3] flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <span className="text-white text-2xl">📷</span>
+          </div>
+          <p className="text-white text-xl font-medium mb-2">
+            Escaneá el QR de la ventanilla {ventanillaSeleccionada}
+          </p>
+          <p className="text-[#A0A0A8] text-sm mb-6">
+            Abrí la app de Mercado Pago, escaneá el código pegado en tu ventanilla
+            y confirmá el pago. Te conectamos apenas se acredite.
+          </p>
+          <button
+            onClick={cancelarPagoQr}
+            className="text-[12px] text-[#5A5A60] underline"
+          >
+            Cancelar
+          </button>
         </div>
       </main>
     );
@@ -532,6 +645,43 @@ function ContenidoPortal() {
               >
                 {cargando === "whatsapp" ? "Generando link..." : "📲 Pagar por WhatsApp"}
               </button>
+            )}
+
+            {config.qrVentanilla && ventanillasDisponibles.length > 0 && (
+              <div className="mt-2.5">
+                {!mostrarSelectorVentanilla ? (
+                  <button
+                    onClick={() => setMostrarSelectorVentanilla(true)}
+                    disabled={ocupado}
+                    className="w-full py-3.5 rounded-xl text-[15px] font-medium bg-[#18181B] border border-[#2A2A2E] hover:bg-[#211A2B] active:scale-[0.98] transition disabled:opacity-60"
+                  >
+                    💳 Pagar escaneando el QR de tu ventanilla
+                  </button>
+                ) : (
+                  <div className="bg-[#18181B] border border-[#2A2A2E] rounded-2xl p-4">
+                    <p className="text-[13px] text-[#A0A0A8] mb-2">
+                      ¿Cuál es el número de tu ventanilla?
+                    </p>
+                    <select
+                      value={ventanillaSeleccionada ?? ""}
+                      onChange={(e) => setVentanillaSeleccionada(Number(e.target.value) || null)}
+                      className="w-full px-4 py-3 rounded-xl bg-[#0A0A0C] border border-[#2A2A2E] text-white mb-3"
+                    >
+                      <option value="">Elegí una ventanilla</option>
+                      {ventanillasDisponibles.map((n) => (
+                        <option key={n} value={n}>Ventanilla {n}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={pagarConVentanilla}
+                      disabled={ocupado || !ventanillaSeleccionada}
+                      className="w-full py-3 rounded-xl text-[14px] font-medium bg-[#6E3FA3] hover:bg-[#5A3286] transition disabled:opacity-60"
+                    >
+                      {cargando === "qr" ? "Preparando cobro..." : "Confirmar"}
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </>
         )}

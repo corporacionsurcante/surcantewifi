@@ -75,6 +75,70 @@ recibe la confirmación por webhook. Lo que falta es el último paso:
    `lib/pagos.ts`) a una base de datos persistente antes de confiar
    en esto para operación real con muchos buses.
 
+## Pago con QR fijo en la ventanilla (Mercado Pago Point/QR en tienda)
+
+Además del pago por Checkout Pro (redirigiendo a Mercado Pago) y por
+WhatsApp, existe un tercer medio de pago: un QR dinámico de Mercado
+Pago pegado físicamente en cada ventanilla del ómnibus. El pasajero
+se conecta primero al WiFi (vía Omada), abre la app de Mercado Pago,
+escanea el QR de su ventanilla y paga; al confirmarse el pago se lo
+conecta automáticamente a internet, sin salir de la app de Mercado Pago.
+
+Podés activar/desactivar este medio de pago (junto con Nave/Galicia,
+Checkout Pro y WhatsApp) desde `/admin`, pestaña "Config".
+
+Configuración necesaria:
+- Variable de entorno `MERCADOPAGO_POS_CATEGORY` (opcional): categoría de
+  punto de venta a usar al crear los QR de las ventanillas en Mercado
+  Pago. Si no se define, se usa la categoría por defecto de la cuenta.
+- Mercado Pago exige una dirección física para crear la "sucursal" donde
+  viven las ventanillas (aunque en realidad estén en un ómnibus). Por
+  defecto se usa Av. General Paz 12235, partido de La Matanza, Buenos
+  Aires (Mercado Pago valida `city_name` contra su propia lista cerrada
+  de partidos/localidades, no acepta cualquier texto).
+  Si hace falta cambiarla, se puede sobreescribir con estas variables
+  (todas opcionales): `MERCADOPAGO_STORE_STREET_NUMBER`,
+  `MERCADOPAGO_STORE_STREET_NAME`, `MERCADOPAGO_STORE_CITY`,
+  `MERCADOPAGO_STORE_STATE`, `MERCADOPAGO_STORE_LAT`, `MERCADOPAGO_STORE_LON`.
+- Desde `/admin`, pestaña "Ventanillas", generás una ventanilla nueva
+  (un punto de cobro independiente) por cada QR físico que vayas a
+  imprimir y pegar, y desde ahí abrís `/ventanillas-imprimir` para
+  imprimirlos todos juntos.
+
+Archivos relevantes:
+- `lib/ventanillas.ts` — almacenamiento (Redis) de las ventanillas/POS
+- `lib/mercadopagoQr.ts` — integración con la API de QR en tienda de Mercado Pago
+- `app/api/admin-ventanillas/route.ts` — alta y listado de ventanillas (protegido por CLAVE_ADMIN)
+- `app/api/ventanillas-publica/route.ts` — lista pública de números de ventanilla disponibles
+- `app/api/crear-pago-qr/route.ts` — genera el pago dinámico sobre una ventanilla elegida
+- `app/ventanillas-imprimir/page.tsx` — vista imprimible de los carteles QR
+- `app/qr/page.tsx` — cartel QR para conectarse al WiFi (paso previo al pago)
+
+## Login del panel admin
+
+El panel `/admin` se protege con dos métodos, ambos habilitados al
+mismo tiempo:
+
+1. **Google** (recomendado): botón "Ingresar con Google". Requiere estas
+   variables de entorno en Vercel:
+   - `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` (credenciales OAuth de
+     Google Cloud Console, con `https://TU-DOMINIO/api/auth/callback/google`
+     agregado como "Authorized redirect URI").
+   - `ADMIN_EMAILS`: lista de emails autorizados separados por coma
+     (por ejemplo `persona1@gmail.com,persona2@gmail.com`). Solo esas
+     cuentas de Google pueden entrar; cualquier otra cuenta es rechazada.
+   - `NEXTAUTH_URL`: la URL pública del sitio (por ejemplo
+     `https://tudominio.com`).
+   - `NEXTAUTH_SECRET`: una cadena aleatoria larga (podés generarla con
+     `openssl rand -base64 32`), usada para firmar las sesiones.
+
+   Si `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` no están configurados,
+   el botón de Google simplemente no va a funcionar (NextAuth queda sin
+   provider), pero el resto del panel sigue funcionando con la clave.
+
+2. **Clave manual** (`CLAVE_ADMIN`): siempre disponible como respaldo,
+   por si Google no está configurado o falla.
+
 ## Estructura del proyecto
 
 - `app/page.tsx` — la pantalla principal que ve el pasajero
