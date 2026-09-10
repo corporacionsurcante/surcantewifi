@@ -25,6 +25,15 @@
 //   Si Mercado Pago lo rechaza al generar ventanillas nuevas desde
 //   el panel admin, se ve el motivo exacto en el error y se puede
 //   ajustar esta variable con el código correcto para la cuenta.
+//
+// Variables opcionales (dirección fiscal de la sucursal): Mercado
+// Pago exige una ubicación física para crear la "sucursal" aunque
+// las ventanillas estén en un ómnibus. Por defecto se usa la
+// dirección de Surcante (Av. General Paz 12235, Lomas del Mirador,
+// Buenos Aires). Si cambia el domicilio, se puede sobreescribir con:
+//   MERCADOPAGO_STORE_STREET_NUMBER, MERCADOPAGO_STORE_STREET_NAME,
+//   MERCADOPAGO_STORE_CITY, MERCADOPAGO_STORE_STATE,
+//   MERCADOPAGO_STORE_LAT, MERCADOPAGO_STORE_LON
 // ──────────────────────────────────────────────────────────────
 
 import { Redis } from "@upstash/redis";
@@ -76,12 +85,27 @@ export async function obtenerOCrearTienda(): Promise<string> {
 
   const collectorId = await obtenerCollectorId();
 
+  // Mercado Pago exige una dirección física para la sucursal (afecta
+  // validación fiscal y facturación), aunque las ventanillas en
+  // realidad estén en un ómnibus. Se usa la dirección de la empresa
+  // como referencia fiscal, configurable por variables de entorno
+  // por si cambia de domicilio.
+  const location = {
+    street_number: process.env.MERCADOPAGO_STORE_STREET_NUMBER || "12235",
+    street_name: process.env.MERCADOPAGO_STORE_STREET_NAME || "Avenida General Paz",
+    city_name: process.env.MERCADOPAGO_STORE_CITY || "Lomas del Mirador",
+    state_name: process.env.MERCADOPAGO_STORE_STATE || "Buenos Aires",
+    latitude: Number(process.env.MERCADOPAGO_STORE_LAT || "-34.6579926"),
+    longitude: Number(process.env.MERCADOPAGO_STORE_LON || "-58.5244947"),
+  };
+
   const creacion = await fetch(`${MP_API}/users/${collectorId}/stores`, {
     method: "POST",
     headers: encabezados(),
     body: JSON.stringify({
       name: "Surcante - Flota",
       external_id: EXTERNAL_ID_TIENDA,
+      location,
     }),
   });
   const datosCreacion = await creacion.json();

@@ -91,6 +91,13 @@ Configuración necesaria:
 - Variable de entorno `MERCADOPAGO_POS_CATEGORY` (opcional): categoría de
   punto de venta a usar al crear los QR de las ventanillas en Mercado
   Pago. Si no se define, se usa la categoría por defecto de la cuenta.
+- Mercado Pago exige una dirección física para crear la "sucursal" donde
+  viven las ventanillas (aunque en realidad estén en un ómnibus). Por
+  defecto se usa Av. General Paz 12235, Lomas del Mirador, Buenos Aires.
+  Si hace falta cambiarla, se puede sobreescribir con estas variables
+  (todas opcionales): `MERCADOPAGO_STORE_STREET_NUMBER`,
+  `MERCADOPAGO_STORE_STREET_NAME`, `MERCADOPAGO_STORE_CITY`,
+  `MERCADOPAGO_STORE_STATE`, `MERCADOPAGO_STORE_LAT`, `MERCADOPAGO_STORE_LON`.
 - Desde `/admin`, pestaña "Ventanillas", generás una ventanilla nueva
   (un punto de cobro independiente) por cada QR físico que vayas a
   imprimir y pegar, y desde ahí abrís `/ventanillas-imprimir` para
